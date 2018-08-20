@@ -1,0 +1,29 @@
+---
+title: "Exploratory Data Analysis"
+author: "Gary Stocks"
+date: "18 August 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tm)
+
+```
+
+### Load data
+
+```{r load, cache=TRUE}
+
+en_US <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US"))
+
+de_DE <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE"), readerControl = list(language = "de_DE"))
+
+fi_FI <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI"), readerControl = list(language = "fi_FI"))
+
+ru_RU <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU"), readerControl = list(language = "ru_RU"))
+
+
+```
+
