@@ -1,38 +1,38 @@
-# Creating Tidy Text
+# Exploratory Data Analysis
 
 library(tidyverse)      # data manipulation & plotting
 library(stringr)        # text cleaning and regular expressions
 library(tidytext)       # provides additional text mining functions
 
-# Extract the first 50 lines
+# ==================================================================================
+        
+# TIDY TEXT
+
+# Extract the first 1000 lines of each file
 con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt", "r")
-twitter <- readLines(con, 50) 
+twitter <- readLines(con, 1000) 
 close(con) 
 
 con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt", "r")
-news <- readLines(con, 50) 
+news <- readLines(con, 1000) 
 close(con) 
 
 con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt", "r")
-blogs <- readLines(con, 50) 
+blogs <- readLines(con, 1000) 
 close(con) 
 
-# Create a tibble
-text_tb <- tibble(source = as.integer(1), text = sample)
-
-# Unnest the texts
-text_tb %>% unnest_tokens(word, text)
-
-# Repeat across all sources
+# Create a tibble with a row for every word in every row of all 3 samples
 titles <- c("Twitter", "News", "Blogs")
 samples <- list(twitter, news, blogs)
 series <- tibble()
 
 for(i in seq_along(titles)) {
         
-        clean <- tibble(source = titles[[i]],
+        clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
-                unnest_tokens(word, text)
+                unnest_tokens(word, text) %>%
+                mutate(source = titles[[i]]) %>%
+                select(source, everything())
         
         series <- rbind(series, clean)
 }
@@ -105,6 +105,7 @@ frequency %>%
         summarize(correlation = cor(source_words, all_words),
                   p_value = cor.test(source_words, all_words)$p.value)
 
+# ==================================================================================
 
 # SENTIMENT ANALYSIS
 
@@ -129,19 +130,34 @@ series %>%
         geom_bar(alpha = 0.5, stat = "identity", show.legend = FALSE) +
         facet_wrap(~ source, ncol = 2, scales = "free_x")
 
-# Try the afinn sentiment data
-series %>%
-        right_join(get_sentiments("afinn")) %>%
-        filter(!is.na(sentiment)) %>%
-        count(sentiment, sort = TRUE)
-
-# This code doesn't work
+# Examine how the different sentiment lexicons differ for each source
 afinn <- series %>%
-        group_by(source) %>%
-        get_sentiments("afinn") %>%
+        group_by(source) %>% 
+        mutate(word_count = 1:n(),
+               index = word_count %/% 50 + 1) %>% 
         inner_join(get_sentiments("afinn")) %>%
+        group_by(source, index) %>%
         summarise(sentiment = sum(score)) %>%
         mutate(method = "AFINN")
+
+bing_and_nrc <- bind_rows(series %>%
+                                  group_by(source) %>% 
+                                  mutate(word_count = 1:n(),
+                                         index = word_count %/% 50 + 1) %>% 
+                                  inner_join(get_sentiments("bing")) %>%
+                                  mutate(method = "Bing"),
+                          series %>%
+                                  group_by(source) %>% 
+                                  mutate(word_count = 1:n(),
+                                         index = word_count %/% 50 + 1) %>%
+                                  inner_join(get_sentiments("nrc") %>%
+                                                     filter(sentiment %in% c("positive", "negative"))) %>%
+                                  mutate(method = "NRC")) %>%
+        count(source, method, index = index , sentiment) %>%
+        ungroup() %>%
+        spread(sentiment, n, fill = 0) %>%
+        mutate(sentiment = positive - negative) %>%
+        select(source, index, method, sentiment)
 
 # Analyse word counts that contribute to each sentiment
 bing_word_counts <- series %>%
@@ -149,7 +165,7 @@ bing_word_counts <- series %>%
         count(word, sentiment, sort = TRUE) %>%
         ungroup()
 
-# View this visually to assess the top n words for each sentiment
+# Views this visually to assess the top n words for each sentiment
 bing_word_counts %>%
         group_by(sentiment) %>%
         top_n(10) %>%
@@ -159,20 +175,41 @@ bing_word_counts %>%
         labs(y = "Contribution to sentiment", x = NULL) +
         coord_flip()
 
-# Tokenize sentences to determine sentence sentiment - news example
-tibble(text = news) %>% 
+# Sentence sentiment analysis
+
+# Use the news analysis
+# Break up by row and sentence
+news_sentences <- tibble(row = 1:length(news),
+                       text = news) %>% 
         unnest_tokens(sentence, text, token = "sentences")
 
-news_sentences <- tibble(text = news) %>% 
-        unnest_tokens(sentence, text, token = "sentences")
-
-news_sentiment <- news_sentences %>%
-        mutate(sentence_num = 1:n(), index = round(sentence_num / n(), 2)) %>%
+# Create a tibble with individual words by sentence within each row
+# Use the AFINN lexicon and compute the net sentiment score for each row (entry)
+row_sent <- news_sentences %>%
+        group_by(row) %>%
+        mutate(sentence_num = 1:n(),
+               index = round(sentence_num / n(), 2)) %>%
         unnest_tokens(word, sentence) %>%
         inner_join(get_sentiments("afinn")) %>%
+        group_by(row, index) %>%
         summarise(sentiment = sum(score, na.rm = TRUE)) %>%
         arrange(desc(sentiment))
 
+# Visualise with a heatmap
+ggplot(row_sent, aes(index, factor(row, levels = sort(unique(row), decreasing = TRUE)), fill = sentiment)) +
+        geom_tile(color = "white") +
+        scale_fill_gradient2() +
+        scale_x_continuous(labels = scales::percent, expand = c(0, 0)) +
+        scale_y_discrete(expand = c(0, 0)) +
+        labs(x = "Row / Entry Progression", y = "Row") +
+        ggtitle("Sentiment of News",
+                subtitle = "Summary of the net sentiment score as you progress through each row") +
+        theme_minimal() +
+        theme(panel.grid.major = element_blank(),
+              panel.grid.minor = element_blank(),
+              legend.position = "top")
+
+# ==================================================================================
 
 # TERM VS DOCUMENT FREQUENCY
 
@@ -203,7 +240,7 @@ freq_by_rank <- source_words %>%
 
 
 ggplot(freq_by_rank, aes(rank, `term freq`, color = source)) +
-        geom_line() +
+        geom_line(show.legend = TRUE) +
         scale_x_log10() +
         scale_y_log10()
 
@@ -244,6 +281,7 @@ source_words %>%
         facet_wrap(~source, ncol = 2, scales = "free") +
         coord_flip()
 
+# ==================================================================================
 
 # WORD RELATIONSHIPS
 
@@ -254,7 +292,7 @@ series <- tibble()
 
 for(i in seq_along(titles)) {
         
-        clean <- tibble(source = titles[[i]],
+        clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
                 unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
                 mutate(source = titles[i]) %>%
@@ -285,17 +323,16 @@ series %>%
         top_n(10) %>%
         ungroup() %>%
         mutate(source = factor(source) %>% forcats::fct_rev()) %>%
-        ggplot(aes(drlib::reorder_within(bigram, n, source), n, fill = source)) +
+        ggplot(aes(bigram, n, source, n, fill = source)) +
         geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
-        drlib::scale_x_reordered() +
         facet_wrap(~ source, ncol = 2, scales = "free") +
         coord_flip()
 
 # Identify the tf-idf of n-grams
 bigram_tf_idf <- series %>%
-                count(source, bigram, sort = TRUE) %>%
-                bind_tf_idf(bigram, source, n) %>%
-                arrange(desc(tf_idf))
+        count(source, bigram, sort = TRUE) %>%
+        bind_tf_idf(bigram, source, n) %>%
+        arrange(desc(tf_idf))
 
 # Visualise the bigrams with the highest tf-idf for each source
 bigram_tf_idf %>%
@@ -303,11 +340,10 @@ bigram_tf_idf %>%
         top_n(15, wt = tf_idf) %>%
         ungroup() %>%
         mutate(source = factor(source) %>% forcats::fct_rev()) %>%
-        ggplot(aes(drlib::reorder_within(bigram, tf_idf, source), tf_idf, fill = source)) +
+        ggplot(aes(bigram, tf_idf, fill = source)) +
         geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
         labs(title = "Highest tf-idf bi-grams",
              x = NULL, y = "tf-idf") +
-        drlib::scale_x_reordered() +
         facet_wrap(~source, ncol = 2, scales = "free") +
         coord_flip()
 
@@ -320,10 +356,10 @@ series %>%
 AFINN <- get_sentiments("afinn")
 
 nots <- series %>%
-                separate(bigram, c("word1", "word2"), sep = " ") %>%
-                filter(word1 == "not") %>%
-                inner_join(AFINN, by = c(word2 = "word")) %>%
-                count(word2, score, sort = TRUE) 
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(word1 == "not") %>%
+        inner_join(AFINN, by = c(word2 = "word")) %>%
+        count(word2, score, sort = TRUE) 
 
 nots %>%
         mutate(contribution = n * score) %>%
@@ -338,22 +374,22 @@ nots %>%
 negation_words <- c("not", "no", "never", "without")
 
 negated <- series %>%
-                separate(bigram, c("word1", "word2"), sep = " ") %>%
-                filter(word1 %in% negation_words) %>%
-                inner_join(AFINN, by = c(word2 = "word")) %>%
-                count(word1, word2, score, sort = TRUE) %>%
-                ungroup()
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(word1 %in% negation_words) %>%
+        inner_join(AFINN, by = c(word2 = "word")) %>%
+        count(word1, word2, score, sort = TRUE) %>%
+        ungroup()
 
+# Visualise
 negated %>%
         mutate(contribution = n * score) %>%
         arrange(desc(abs(contribution))) %>%
         group_by(word1) %>%
         top_n(10, abs(contribution)) %>%
-        ggplot(aes(drlib::reorder_within(word2, contribution, word1), contribution, fill = contribution > 0)) +
+        ggplot(aes(word2, contribution, fill = contribution > 0)) +
         geom_bar(stat = "identity", show.legend = FALSE) +
         xlab("Words preceded by 'not'") +
         ylab("Sentiment score * # of occurrances") +
-        drlib::scale_x_reordered() +
         facet_wrap(~ word1, scales = "free") +
         coord_flip()
 
@@ -361,14 +397,15 @@ negated %>%
 library(igraph)
 
 bigram_graph <- series %>%
-                separate(bigram, c("word1", "word2"), sep = " ") %>%
-                filter(!word1 %in% stop_words$word,
-                       !word2 %in% stop_words$word) %>%
-                count(word1, word2, sort = TRUE) %>%
-                unite("bigram", c(word1, word2), sep = " ") %>%
-                filter(n > 20) %>%
-                graph_from_data_frame()
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word) %>%
+        count(word1, word2, sort = TRUE) %>%
+        unite("bigram", c(word1, word2), sep = " ") %>%
+        filter(n > 20) %>%
+        graph_from_data_frame()
 
+# Utilise ggraph to convert igraph object to a ggplot-like graphic
 library(ggraph)
 set.seed(123)
 
@@ -383,14 +420,14 @@ ggraph(bigram_graph, layout = "fr") +
 # Word correlation
 news_words <- tibble(row = seq_along(news),
                      text = news) %>%
-                unnest_tokens(word, text) %>%
-                filter(!word %in% stop_words$word)
+        unnest_tokens(word, text) %>%
+        filter(!word %in% stop_words$word)
 
 # We can leverage the widyr package to count common pairs of words in the same row
 library(widyr)
 
 word_pairs <- news_words %>%
-                pairwise_count(word, row, sort = TRUE)
+        pairwise_count(word, row, sort = TRUE)
 
 # Look for which words most often follow "hard", for example
 word_pairs %>% 
@@ -398,7 +435,28 @@ word_pairs %>%
 
 # Correlation
 word_cor <- news_words %>%
-                group_by(word) %>%
-                filter(n() >= 20) %>%
-                pairwise_cor(word, row) %>%
-                filter(!is.na(correlation))
+        group_by(word) %>%
+        filter(n() >= 20) %>%
+        pairwise_cor(word, row) %>%
+        filter(!is.na(correlation))
+
+# Assess correlation for words of interest, e.g. "home"
+word_cor %>%
+        filter(item1 == "home") %>%
+        arrange(desc(correlation))
+
+# Visualise correlation for word clusters
+set.seed(123)
+
+news_words %>%
+        group_by(word) %>%
+        filter(n() >= 20) %>%
+        pairwise_cor(word, row) %>%
+        filter(!is.na(correlation),
+               correlation > .1) %>%
+        graph_from_data_frame() %>%
+        ggraph(layout = "fr") +
+        geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE) +
+        geom_node_point(color = "lightblue", size = 5) +
+        geom_node_text(aes(label = name), repel = TRUE) +
+        theme_void()

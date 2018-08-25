@@ -3,10 +3,16 @@
 # Load libraries
 library(tm)
 
+
+# WEEK 1 TASKS AND QUIZ
+
 # Load the first 5 lines of en_US twitter data
 con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt", "r")
-sample <- readLines(con, 5) 
+sample <- readLines(con, 10) 
 close(con) 
+
+# Remove words
+
 
 # Extract random sample of data and store in a file
 sampleFile <- function(infile, outfile, header = TRUE) {
@@ -40,7 +46,7 @@ infile <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone
 lines <- length(readLines(infile))
 
 
-# GETTING STARTED QUIZ
+# Getting Started Quiz
 
 # In the en_US twitter data set, if you divide the number of lines where the word 
 # "love" (all lowercase) occurs by the number of lines the word "hate" (all lowercase) 
@@ -126,6 +132,32 @@ while (TRUE) {
 
 close(con)
 
+
+# Tasks to accomplish
+
+# Tokenization - identifying appropriate tokens such as words, punctuation, and 
+# numbers. Writing a function that takes a file as input and returns a tokenized 
+# version of it.
+
+# See https://cran.r-project.org/web/packages/quanteda/vignettes/quickstart.html 
+
+library(quanteda)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt", "r")
+sample <- readLines(con, 5) 
+close(con) 
+
+tokens(sample)
+tokens(sample, remove_numbers = TRUE, remove_punct = TRUE)
+
+
+#Profanity filtering - removing profanity and other words you do not want to predict.
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/sample.txt", "r")
+profanities <- " +[Uu]ghh. +"
+gsub(profanities, "", sample)
+close(con)
+
+# Try dfm() in the quanteda package to remove profanities and stopwords
 
 
 # Import files
