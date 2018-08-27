@@ -3,33 +3,102 @@
 library(tidyverse)      # data manipulation & plotting
 library(stringr)        # text cleaning and regular expressions
 library(tidytext)       # provides additional text mining functions
+library(tm)
+library(quanteda)
 
 # ==================================================================================
         
 # TIDY TEXT
 
-# Extract the first 1000 lines of each file
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt", "r")
-twitter <- readLines(con, 1000) 
+# Extract a random sample of 30% of each file and store in a file
+sampleFile <- function(infile, outfile, header = TRUE) {
+        set.seed(12345)
+        ci <- file(infile, "r")
+        co <- file(outfile, "w")
+        if (header) {
+                hdr <- readLines(ci, n = 1)
+                writeLines(hdr, co)
+        }
+        recnum = 0
+        numout = 0
+        while (TRUE) {
+                inrec <- readLines(ci, n = 1)
+                if (length(inrec) == 0) { # end of file?
+                        close(co)
+                        close(ci)
+                        return(numout)
+                }
+                recnum <- recnum + 1
+                if (rbinom(1, 1, prob = .3) == 1) {
+                        numout <- numout + 1
+                        writeLines(inrec, co)
+                }
+        }
+}
+
+# Extract Twitter sample
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
+sampleFile(t, "twitter.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt", "r")
+twitter <- readLines(con) 
 close(con) 
 
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt", "r")
-news <- readLines(con, 1000) 
+# Extract news sample
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
+sampleFile(n, "news.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+news <- readLines(con) 
 close(con) 
 
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt", "r")
-blogs <- readLines(con, 1000) 
+# Extract blogs sample
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
+sampleFile(b, "blogs.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+blogs <- readLines(con) 
 close(con) 
+
+# Clean text using regular expressions
+reg1 <- "&amp;|&lt;|&gt;"
+reg2 <- "[0-9]+"
+reg3 <- "[Ss][Hh][Ii][Tt] | [Ff][Uu][Cc][Kk] | [Ff][Uu][Cc][Kk][Ii][Nn][Gg] | [Bb][Ii][Tt][Cc][Hh] | [Aa][Ss][Ss]"
+reg4 <- "\ðÿ"
+reg5 <- "â"
+
+##### Find the top 50 words from the files in other languages, create a data frame
+##### with these terms and perform an anti-join to remove them
+
+
+twitter_cleaned <- gsub(reg1, " ", twitter)
+twitter_cleaned <- gsub(reg2, " ", twitter_cleaned)
+twitter_cleaned <- gsub(reg3, " ", twitter_cleaned)
+twitter_cleaned <- gsub(reg4, " ", twitter_cleaned, fixed = TRUE)
+twitter_cleaned <- gsub(reg5, " ", twitter_cleaned, fixed = TRUE)
+
+news_cleaned <- gsub(reg1, " ", news)
+news_cleaned <- gsub(reg2, " ", news_cleaned)
+news_cleaned <- gsub(reg3, " ", news_cleaned)
+news_cleaned <- gsub(reg4, " ", news_cleaned, fixed = TRUE)
+news_cleaned <- gsub(reg5, " ", news_cleaned, fixed = TRUE)
+
+blogs_cleaned <- gsub(reg1, " ", blogs)
+blogs_cleaned <- gsub(reg2, " ", blogs_cleaned)
+blogs_cleaned <- gsub(reg3, " ", blogs_cleaned)
+blogs_cleaned <- gsub(reg4, " ", blogs_cleaned, fixed = TRUE)
+blogs_cleaned <- gsub(reg5, " ", blogs_cleaned, fixed = TRUE)
 
 # Create a tibble with a row for every word in every row of all 3 samples
 titles <- c("Twitter", "News", "Blogs")
-samples <- list(twitter, news, blogs)
+samples <- list(twitter_cleaned, news_cleaned, blogs_cleaned)
 series <- tibble()
 
 for(i in seq_along(titles)) {
         
         clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%
                 unnest_tokens(word, text) %>%
                 mutate(source = titles[[i]]) %>%
                 select(source, everything())
@@ -47,11 +116,17 @@ series %>%
         count(word, sort = TRUE)
 
 # Find the top 10 most common words from each source
-series %>%
+topWords <- series %>%
         anti_join(stop_words) %>%
         group_by(source) %>%
         count(word, sort = TRUE) %>%
         top_n(10)
+
+# Is this necessary?
+series %>%
+        filter(!str_detect(text, "^RT")) %>%
+        mutate(text = str_remove_all(text, remove_reg)) %>%
+        unnest_tokens(word, text, token = )
 
 # Visualise the top 10 most common words from each source
 series %>%
@@ -238,7 +313,6 @@ freq_by_rank <- source_words %>%
         mutate(rank = row_number(),
                `term freq` = n / total)
 
-
 ggplot(freq_by_rank, aes(rank, `term freq`, color = source)) +
         geom_line(show.legend = TRUE) +
         scale_x_log10() +
@@ -287,9 +361,10 @@ source_words %>%
 
 # n-gram analysis
 titles <- c("Twitter", "News", "Blogs")
-samples <- list(twitter, news, blogs)
+samples <- list(twitter_cleaned, news_cleaned, blogs_cleaned)
 series <- tibble()
 
+# 2-gram
 for(i in seq_along(titles)) {
         
         clean <- tibble(row = seq_along(samples[[i]]),
@@ -417,6 +492,70 @@ ggraph(bigram_graph, layout = "fr") +
         geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
         theme_void()
 
+# Repeat for 3-gram
+series <- tibble()
+
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                unnest_tokens(trigram, text, token = "ngrams", n = 3) %>%
+                mutate(source = titles[i]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Look at the most common tri-grams across all sources
+series %>%
+        count(trigram, sort = TRUE)
+
+# Filter out common stop words
+series %>%
+        separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word,
+               !word3 %in% stop_words$word) %>%        
+        count(word1, word2, word3, sort = TRUE)
+
+# Visualise the top 10 tri-grams for each source
+series %>%
+        separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word,
+               !word3 %in% stop_words$word) %>%
+        count(source, word1, word2, word3, sort = TRUE) %>%
+        unite("trigram", c(word1, word2, word3), sep = " ") %>%
+        group_by(source) %>%
+        top_n(10) %>%
+        ungroup() %>%
+        mutate(source = factor(source) %>% forcats::fct_rev()) %>%
+        ggplot(aes(trigram, n, source, n, fill = source)) +
+        geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+        facet_wrap(~ source, ncol = 2, scales = "free") +
+        coord_flip()
+
+# Identify the tf-idf of n-grams
+trigram_tf_idf <- series %>%
+        count(source, trigram, sort = TRUE) %>%
+        bind_tf_idf(trigram, source, n) %>%
+        arrange(desc(tf_idf))
+
+# Visualise the tri-grams with the highest tf-idf for each source
+trigram_tf_idf %>%
+        group_by(source) %>%
+        top_n(15, wt = tf_idf) %>%
+        ungroup() %>%
+        mutate(source = factor(source) %>% forcats::fct_rev()) %>%
+        ggplot(aes(trigram, tf_idf, fill = source)) +
+        geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+        labs(title = "Highest tf-idf tri-grams",
+             x = NULL, y = "tf-idf") +
+        facet_wrap(~source, ncol = 2, scales = "free") +
+        coord_flip()
+
+
+
 # Word correlation
 news_words <- tibble(row = seq_along(news),
                      text = news) %>%
@@ -460,3 +599,28 @@ news_words %>%
         geom_node_point(color = "lightblue", size = 5) +
         geom_node_text(aes(label = name), repel = TRUE) +
         theme_void()
+
+# ==================================================================================
+
+# CONVERTING BETWEEN TIDY AND NON-TIDY FORMATS
+
+# See https://uc-r.github.io/text_conversion
+
+# Create a document-feature-matrix (DFM) for each source
+
+
+# ==================================================================================
+
+# TM ANALYSIS
+
+# Create a corpus
+myCorpus_tm <- SimpleCorpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/sampledata"))
+
+# Create a document term matrix (DTM)
+dtm <- DocumentTermMatrix(myCorpus_tm, control = list(removePunctuation = TRUE,
+                                                      removeNumbers = TRUE,
+                                                      stopwords = TRUE))
+
+
+
+
