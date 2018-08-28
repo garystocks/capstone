@@ -64,12 +64,209 @@ close(con)
 reg1 <- "&amp;|&lt;|&gt;"
 reg2 <- "[0-9]+"
 reg3 <- "[Ss][Hh][Ii][Tt] | [Ff][Uu][Cc][Kk] | [Ff][Uu][Cc][Kk][Ii][Nn][Gg] | [Bb][Ii][Tt][Cc][Hh] | [Aa][Ss][Ss]"
-reg4 <- "\ðÿ"
+reg4 <- "\\ðÿ"
 reg5 <- "â"
 
 ##### Find the top 50 words from the files in other languages, create a data frame
 ##### with these terms and perform an anti-join to remove them
 
+# German data set ------------------------------------------------------------------
+
+# Extract Twitter sample
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE/de_DE.twitter.txt"
+sampleFile(t, "twitterDE.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitterDE.txt", "r")
+twitterDE <- readLines(con) 
+close(con) 
+
+# Extract news sample
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE/de_DE.news.txt"
+sampleFile(n, "newsDE.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsDE.txt", "r")
+newsDE <- readLines(con) 
+close(con) 
+
+# Extract blogs sample
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE/de_DE.blogs.txt"
+sampleFile(b, "blogsDE.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsDE.txt", "r")
+blogsDE <- readLines(con) 
+close(con) 
+
+# Create a tibble with a row for every word in every row of all 3 samples
+titles <- c("Twitter", "News", "Blogs")
+samples <- list(twitterDE, newsDE, blogsDE)
+series <- tibble()
+
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%
+                unnest_tokens(word, text) %>%
+                mutate(source = titles[[i]]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Find the subset of unique words in a frequency-sorted dictionary
+# to cover 50% of all word instances in the language
+count <- 0
+wordSum <- sum(frequency$n)
+wordDictionary <- data.frame(word = as.character(""), stringsAsFactors = FALSE)
+
+for(i in 1:length(frequency$n)) {
+        count <- count + frequency$n[i]
+        wordDictionary$word[i] <- frequency$word[i]
+        
+        if(count / wordSum >= .5) {
+                break
+        }
+        wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
+}
+
+wordDictionaryDE <- wordDictionary
+
+# Finnish data set ------------------------------------------------------------------
+
+# Extract Twitter sample
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI/fi_FI.twitter.txt"
+sampleFile(t, "twitterFI.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitterFI.txt", "r")
+twitterFI <- readLines(con) 
+close(con) 
+
+# Extract news sample
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI/fi_FI.news.txt"
+sampleFile(n, "newsFI.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsFI.txt", "r")
+newsFI <- readLines(con) 
+close(con) 
+
+# Extract blogs sample
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI/fi_FI.blogs.txt"
+sampleFile(b, "blogsFI.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsFI.txt", "r")
+blogsFI <- readLines(con) 
+close(con) 
+
+# Create a tibble with a row for every word in every row of all 3 samples
+titles <- c("Twitter", "News", "Blogs")
+samples <- list(twitterFI, newsFI, blogsFI)
+series <- tibble()
+
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%
+                unnest_tokens(word, text) %>%
+                mutate(source = titles[[i]]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Find the subset of unique words in a frequency-sorted dictionary
+# to cover 50% of all word instances in the language
+count <- 0
+wordSum <- sum(frequency$n)
+wordDictionary <- data.frame(word = as.character(""), stringsAsFactors = FALSE)
+
+for(i in 1:length(frequency$n)) {
+        count <- count + frequency$n[i]
+        wordDictionary$word[i] <- frequency$word[i]
+        
+        if(count / wordSum >= .5) {
+                break
+        }
+        wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
+}
+
+wordDictionaryFI <- wordDictionary
+
+# Russian data set ------------------------------------------------------------------
+
+# Extract Twitter sample
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.twitter.txt"
+sampleFile(t, "twitterRU.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitterRU.txt", "r")
+twitterRU <- readLines(con) 
+close(con) 
+
+# Extract news sample
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.news.txt"
+sampleFile(n, "newsRU.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsRU.txt", "r")
+newsRU <- readLines(con) 
+close(con) 
+
+# Extract blogs sample
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.blogs.txt"
+sampleFile(b, "blogsRU.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsRU.txt", "r")
+blogsRU <- readLines(con) 
+close(con) 
+
+# Create a tibble with a row for every word in every row of all 3 samples
+titles <- c("Twitter", "News", "Blogs")
+samples <- list(twitterRU, newsRU, blogsRU)
+series <- tibble()
+
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%
+                unnest_tokens(word, text) %>%
+                mutate(source = titles[[i]]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Find the subset of unique words in a frequency-sorted dictionary
+# to cover 50% of all word instances in the language
+count <- 0
+wordSum <- sum(frequency$n)
+wordDictionary <- data.frame(word = as.character(""), stringsAsFactors = FALSE)
+
+for(i in 1:length(frequency$n)) {
+        count <- count + frequency$n[i]
+        wordDictionary$word[i] <- frequency$word[i]
+        
+        if(count / wordSum >= .5) {
+                break
+        }
+        wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
+}
+
+wordDictionaryRU <- wordDictionary
+
+
+# Back to English data set ---------------------------------------------------------
 
 twitter_cleaned <- gsub(reg1, " ", twitter)
 twitter_cleaned <- gsub(reg2, " ", twitter_cleaned)
@@ -107,12 +304,31 @@ for(i in seq_along(titles)) {
 }
 
 # Count word frequency
-series %>%
+frequency <- series %>%
         count(word, sort = TRUE)
+
+# Find the subset of unique words in a frequency-sorted dictionary
+# to cover 50% of all word instances in the language
+count <- 0
+wordSum <- sum(frequency$n)
+wordDictionary <- data.frame(word = as.character(""), stringsAsFactors = FALSE)
+
+for(i in 1:length(frequency$n)) {
+        count <- count + frequency$n[i]
+        wordDictionary$word[i] <- frequency$word[i]
+
+        if(count / wordSum >= .5) {
+                break
+        }
+        wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
+}
 
 # Count word frequency after removing stop words
 series %>%
         anti_join(stop_words) %>%
+        anti_join(wordDictionaryDE) %>%
+        anti_join(wordDictionaryRU) %>%
+        anti_join(wordDictionaryFI) %>%
         count(word, sort = TRUE)
 
 # Find the top 10 most common words from each source
