@@ -222,7 +222,7 @@ close(con)
 b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.blogs.txt"
 sampleFile(b, "blogsRU.txt", header = FALSE)
 
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsRU.txt", "r")
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogsRU.txt", "r")
 blogsRU <- readLines(con) 
 close(con) 
 
@@ -303,6 +303,22 @@ for(i in seq_along(titles)) {
         series <- rbind(series, clean)
 }
 
+# Download a list of profanities
+fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
+temp <- tempfile()
+
+if(!file.exists("profanity-list.csv")) {
+        download.file(fileURL,temp, mode="wb")
+        unzip(temp, "profanity-list.csv")
+}
+
+profanity <- read.csv("profanity-list.csv", header=FALSE)
+profanity <- as.data.frame(profanity, stringsAsFactors = FALSE)
+colnames(profanity) <- c("word")
+
+# Remove profanities
+series <- anti_join(series, profanity)
+
 # Count word frequency
 frequency <- series %>%
         count(word, sort = TRUE)
@@ -323,12 +339,14 @@ for(i in 1:length(frequency$n)) {
         wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
 }
 
-# Count word frequency after removing stop words
+# Count word frequency after removing stop words and common foreign words
+series2 <- anti_join(series, wordDictionaryDE)
+series3 <- anti_join(series2, wordDictionaryFI)
+series4 <- anti_join(series3, wordDictionaryRU)
+series <- series4
+
 series %>%
         anti_join(stop_words) %>%
-        anti_join(wordDictionaryDE) %>%
-        anti_join(wordDictionaryRU) %>%
-        anti_join(wordDictionaryFI) %>%
         count(word, sort = TRUE)
 
 # Find the top 10 most common words from each source
@@ -579,6 +597,8 @@ source_words %>%
 titles <- c("Twitter", "News", "Blogs")
 samples <- list(twitter_cleaned, news_cleaned, blogs_cleaned)
 series <- tibble()
+
+### Need to remove profanities
 
 # 2-gram
 for(i in seq_along(titles)) {
@@ -832,11 +852,65 @@ news_words %>%
 # Create a corpus
 myCorpus_tm <- SimpleCorpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/sampledata"))
 
+# Download a list of profanities
+fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
+temp <- tempfile()
+
+if(!file.exists("profanity-list.csv")) {
+        download.file(fileURL,temp, mode="wb")
+        unzip(temp, "profanity-list.csv")
+}
+
+profanity <- read.csv("profanity-list.csv", header=FALSE)
+profanity <- as.vector(t(profanity))
+
+# Pre-process the data by removing punctuation, white space, stop words, numbers 
+# and profanities, and convert to lower case
+myCorpus_tm <- tm_map(myCorpus_tm, removePunctuation)
+myCorpus_tm <- tm_map(myCorpus_tm, stripWhitespace)
+myCorpus_tm <- tm_map(myCorpus_tm, removeWords, stopwords("english"))
+myCorpus_tm <- tm_map(myCorpus_tm, removeNumbers)
+myCorpus_tm <- tm_map(myCorpus_tm, removeWords, profanity)
+myCorpus_tm <- tm_map(myCorpus_tm, content_transformer(tolower))
+
+
 # Create a document term matrix (DTM)
 dtm <- DocumentTermMatrix(myCorpus_tm, control = list(removePunctuation = TRUE,
                                                       removeNumbers = TRUE,
                                                       stopwords = TRUE))
 
+# ==================================================================================
 
+# QUANTEDA ANALYSIS
 
+# Create document frequency matrices
+twitter_dfm <- quanteda::dfm(twitter_cleaned, verbose = FALSE)
 
+# Convert to a tidy data frame
+twitter_tidy <- tidy(twitter_dfm)
+
+# Convert tidy data frame (series) to a document frequency matrix (dfm)
+my_dfm <- series %>%
+        cast_dfm(word, source)
+
+# Create a corpus
+my_corpus_qu <- quanteda::corpus(myCorpus_tm)
+
+# Tokenize -  ADD ARGUMENTS TO REMOVE NUMBERS, ETC.
+my_tokens <- tokens(my_corpus_qu)
+
+# Create a dictionary object
+my_dictionary_DE <- dictionary(as.list(wordDictionaryDE))
+
+# Find out how many common German words are in the corpus
+dfm(tokens_lookup(my_tokens, my_dictionary_DE, valuetype = "glob", verbose = TRUE))
+
+# Create n-grams
+tokens_ngrams(my_tokens, n = 2L)
+tokens_ngrams(my_tokens, n = 3L)
+
+# Create a document-feature-matrix (dfm)
+my_dfm <- dfm(my_corpus_qu, valuetype = "glob")
+
+# Use stemming to reduce the number of words required ??????
+my_tokens_stemmed <- tokens_wordstem(my_tokens, language = quanteda_options("language_stemmer"))
