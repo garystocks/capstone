@@ -884,33 +884,76 @@ dtm <- DocumentTermMatrix(myCorpus_tm, control = list(removePunctuation = TRUE,
 # QUANTEDA ANALYSIS
 
 # Create document frequency matrices
-twitter_dfm <- quanteda::dfm(twitter_cleaned, verbose = FALSE)
+# twitter_dfm <- quanteda::dfm(twitter_cleaned, verbose = FALSE)
 
 # Convert to a tidy data frame
-twitter_tidy <- tidy(twitter_dfm)
+# twitter_tidy <- tidy(twitter_dfm)
 
 # Convert tidy data frame (series) to a document frequency matrix (dfm)
-my_dfm <- series %>%
-        cast_dfm(word, source)
+# my_dfm <- series %>%
+#        cast_dfm(word, source)
 
 # Create a corpus
 my_corpus_qu <- quanteda::corpus(myCorpus_tm)
 
-# Tokenize -  ADD ARGUMENTS TO REMOVE NUMBERS, ETC.
-my_tokens <- tokens(my_corpus_qu)
+# Tokenize and clean
+my_tokens <- tokens(my_corpus_qu, remove_numbers = TRUE, remove_punct = TRUE,
+                    remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE,
+                    remove_hyphens = TRUE, remove_url = TRUE)
 
-# Create a dictionary object
-my_dictionary_DE <- dictionary(as.list(wordDictionaryDE))
+# Remove stop words and profanities
+my_tokens <- tokens_remove(my_tokens, stopwords("english"))
 
-# Find out how many common German words are in the corpus
-dfm(tokens_lookup(my_tokens, my_dictionary_DE, valuetype = "glob", verbose = TRUE))
+# Download a list of profanities
+fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
+temp <- tempfile()
+
+if(!file.exists("profanity-list.csv")) {
+        download.file(fileURL,temp, mode="wb")
+        unzip(temp, "profanity-list.csv")
+}
+
+profanity <- read.csv("profanity-list.csv", header=FALSE)
+
+my_tokens <- tokens_remove(my_tokens, profanity$V1)
+
+# Convert to lower case
+my_tokens <- tokens_tolower(my_tokens)
+
+# Count words
+ntoken(my_tokens)
 
 # Create n-grams
-tokens_ngrams(my_tokens, n = 2L)
-tokens_ngrams(my_tokens, n = 3L)
+my_tokens_2g <- tokens_ngrams(my_tokens, n = 2L)
+my_tokens_3g <- tokens_ngrams(my_tokens, n = 3L)
 
 # Create a document-feature-matrix (dfm)
-my_dfm <- dfm(my_corpus_qu, valuetype = "glob")
+my_dfm <- dfm(my_tokens, valuetype = "glob")
+
+# Draw a word cloud
+textplot_wordcloud(my_dfm, min_size = 0.5, max_size = 4, min_count = 10,
+                   max_words = 100, color = "darkblue", font = NULL, adjust = 0,
+                   rotation = 0.1, random_order = FALSE, random_color = FALSE,
+                   ordered_color = FALSE, labelcolor = "gray20", labelsize = 1.5,
+                   labeloffset = 0, fixed_aspect = TRUE, comparison = FALSE)
+
+# Find the top 30 features - HOW DO I CLEAN TEXT FIRST???
+textstat_frequency(my_dfm, n = 30)
+
+# Plot
+textplot_network(my_dfm, min_freq = 0.5, omit_isolated = TRUE,
+                 edge_color = "#1F78B4", edge_alpha = 0.5, edge_size = 2,
+                 vertex_color = "#4D4D4D", vertex_size = 2, vertex_labelcolor = NULL,
+                 vertex_labelfont = NULL, offset = NULL)
+
+
+# Create a dictionary object
+# my_dictionary_DE <- dictionary(as.list(wordDictionaryDE))
+
+# Find out how many common German words are in the corpus
+# dfm(tokens_lookup(my_tokens, my_dictionary_DE, valuetype = "glob", verbose = TRUE))
+
+
 
 # Use stemming to reduce the number of words required ??????
 my_tokens_stemmed <- tokens_wordstem(my_tokens, language = quanteda_options("language_stemmer"))
