@@ -5,6 +5,7 @@ library(stringr)        # text cleaning and regular expressions
 library(tidytext)       # provides additional text mining functions
 library(tm)
 library(quanteda)
+library(textcat)
 
 # ==================================================================================
         
@@ -920,6 +921,26 @@ my_tokens <- tokens_remove(my_tokens, profanity$V1)
 # Convert to lower case
 my_tokens <- tokens_tolower(my_tokens)
 
+# Find out how many words are German, using the frequent German words
+dict_DE <- dictionary(as.list(wordDictionaryDE))
+dfm(tokens_lookup(my_tokens, dict_DE, valuetype = "glob"))
+
+dict_FI <- dictionary(as.list(wordDictionaryFI))
+dfm(tokens_lookup(my_tokens, dict_FI, valuetype = "glob"))
+
+dict_RU <- dictionary(as.list(wordDictionaryRU))
+dfm(tokens_lookup(my_tokens, dict_RU, valuetype = "glob"))
+
+
+# dictfile <- tempfile()
+# downloa
+#              dictfile, mode = "wb")
+# unzip(dictfile, exdir = (td <- tempdir()))
+# lgdict <- dictionary(file = paste(td, "LaverGarry.cat", sep = "/"))
+# head(dfm(data_corpus_inaugural, dictionary = lgdict))
+
+
+
 # Count words
 ntoken(my_tokens)
 
@@ -928,7 +949,7 @@ my_tokens_2g <- tokens_ngrams(my_tokens, n = 2L)
 my_tokens_3g <- tokens_ngrams(my_tokens, n = 3L)
 
 # Create a document-feature-matrix (dfm)
-my_dfm <- dfm(my_tokens, valuetype = "glob")
+my_dfm <- dfm(my_tokens, stem = TRUE, valuetype = "glob")
 
 # Draw a word cloud
 textplot_wordcloud(my_dfm, min_size = 0.5, max_size = 4, min_count = 10,
@@ -946,6 +967,13 @@ textplot_network(my_dfm, min_freq = 0.5, omit_isolated = TRUE,
                  vertex_color = "#4D4D4D", vertex_size = 2, vertex_labelcolor = NULL,
                  vertex_labelfont = NULL, offset = NULL)
 
+# Cluster dendrogram
+dist <- textstat_dist(my_dfm)
+clust <- hclust(dist)
+plot(clust, xlab = "Distance", ylab = NULL)
+
+# Convert dfm to a tidy text object
+my_tidy <- tidy(my_dfm)
 
 # Create a dictionary object
 # my_dictionary_DE <- dictionary(as.list(wordDictionaryDE))
@@ -957,3 +985,24 @@ textplot_network(my_dfm, min_freq = 0.5, omit_isolated = TRUE,
 
 # Use stemming to reduce the number of words required ??????
 my_tokens_stemmed <- tokens_wordstem(my_tokens, language = quanteda_options("language_stemmer"))
+
+
+# ==================================================================================
+
+# PERFORMANCE ANALYSIS
+
+object.size(my_tokens)
+object.size(my_tokens_2g)
+object.size(my_tokens_3g)
+
+Rprof()
+
+gc()
+
+# ==================================================================================
+
+# STATISTICAL ANALYSIS
+
+library(mscsweblm4r)
+weblmInit()
+

@@ -1,29 +1,99 @@
 ---
 title: "Exploratory Data Analysis"
 author: "Gary Stocks"
-date: "18 August 2018"
+date: "1 September 2018"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-library(tm)
+library(tidyverse)      # data manipulation & plotting
+library(stringr)        # text cleaning and regular expressions
+library(tidytext)       # provides additional text mining functions
+library(quanteda)       # quantitative analysis of text
+library(tm)             # quantitative analysis of text
+library(textcat)        # NOTE SURE IF THIS IS NEEDED
+
 
 ```
 
-### Load data
+### Overview
+The objective is to develop a model to predict the next word a user will enter after having typed a few words. This can be used to make a mobile app more user friendly by limiting the typing a user needs to perform.
+
+The dataset is made up of twitter, news and blog data. It was supplied by Swiftkey for the Johns Hopkins Data Science coursera capstone project, and is downloaded from [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). 
+
+After loading the data, a subset is extracted due to the large dataset. This is explored to understand the characteristics of the data. Then pre-processing is used to prepare the data before analysing word and n-gram frequencies.
+
+The results ...
+
+### Load Data
+First, a function is defined to extract a sample of data from each of the US english (en_US) twitter, news and blogs files, and the result is stored in a local file. The table shows the size (in MB) and number of lines for each sample.
 
 ```{r load, cache=TRUE}
 
-en_US <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US"))
+# Define a function to extract a random sample of 30% of each file and store in a file
+sampleFile <- function(infile, outfile, header = TRUE) {
+        set.seed(12345)
+        ci <- file(infile, "r")
+        co <- file(outfile, "w")
+        if (header) {
+                hdr <- readLines(ci, n = 1)
+                writeLines(hdr, co)
+        }
+        recnum = 0
+        numout = 0
+        while (TRUE) {
+                inrec <- readLines(ci, n = 1)
+                if (length(inrec) == 0) { # end of file?
+                        close(co)
+                        close(ci)
+                        return(numout)
+                }
+                recnum <- recnum + 1
+                if (rbinom(1, 1, prob = .3) == 1) {
+                        numout <- numout + 1
+                        writeLines(inrec, co)
+                }
+        }
+}
 
-de_DE <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE"), readerControl = list(language = "de_DE"))
+# Extract Twitter sample
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
+sampleFile(t, "twitter.txt", header = FALSE)
 
-fi_FI <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI"), readerControl = list(language = "fi_FI"))
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt", "r")
+twitter <- readLines(con) 
+close(con) 
 
-ru_RU <- Corpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU"), readerControl = list(language = "ru_RU"))
+# Extract news sample
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
+sampleFile(n, "news.txt", header = FALSE)
 
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+news <- readLines(con) 
+close(con) 
+
+# Extract blogs sample
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
+sampleFile(b, "blogs.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+blogs <- readLines(con) 
+close(con) 
+
+# Determine the size and number of words in each sample file
+samples <- data.frame(size = as.numeric(), lines = as.integer())
+samples[nrow(samples) + 1, ] = list(round(file.size("twitter.txt") / 1000000, 2), length(twitter))
+samples[nrow(samples) + 1, ] = list(round(file.size("news.txt") / 1000000, 2), length(news))
+samples[nrow(samples) + 1, ] = list(round(file.size("blogs.txt") / 1000000, 2), length(blogs))
+row.names(samples) <- c("twitter", "news", "blogs")
+samples
 
 ```
+
+### Clean Data
+
+
+### Explore Data
 
