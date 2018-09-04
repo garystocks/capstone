@@ -1,0 +1,427 @@
+---
+title: "Exploratory Text Mining"
+author: "Gary Stocks"
+date: "04 September 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)      # data manipulation & plotting
+library(stringr)        # text cleaning and regular expressions
+library(tidytext)       # provides additional text mining functions
+library(quanteda)       # quantitative analysis of text
+library(tm)             # quantitative analysis of text
+library(textcat)        # NOTE SURE IF THIS IS NEEDED
+
+```
+
+### Overview
+The objective is to develop a model to predict the next word a user will enter after having typed a few words. This can be used to make a mobile app more user friendly by limiting the typing a user needs to perform.
+
+The dataset is made up of twitter, news and blog data. It was supplied by Swiftkey for the Johns Hopkins Data Science coursera capstone project, and is downloaded from [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). 
+
+After loading the data, a subset is extracted due to the large dataset. This is explored to understand the characteristics of the data. Then pre-processing is used to prepare the data before analysing word and n-gram frequencies.
+
+The results ...
+
+### Load Data
+First, a function is defined to extract a sample of data from each of the US english (en_US) twitter, news and blogs files. Each of the 3 files are then sampled, and the result is stored in a local file. The table shows the size (in MB) and number of lines for each sample.
+
+```{r load}
+
+# Define a function to extract a random sample of 30% of each file and store in a file
+sampleFile <- function(infile, outfile, header = TRUE) {
+        set.seed(12345)
+        ci <- file(infile, "r")
+        co <- file(outfile, "w")
+        if (header) {
+                hdr <- readLines(ci, n = 1)
+                writeLines(hdr, co)
+        }
+        recnum = 0
+        numout = 0
+        while (TRUE) {
+                inrec <- readLines(ci, n = 1)
+                if (length(inrec) == 0) { # end of file?
+                        close(co)
+                        close(ci)
+                        return(numout)
+                }
+                recnum <- recnum + 1
+                if (rbinom(1, 1, prob = .3) == 1) {
+                        numout <- numout + 1
+                        writeLines(inrec, co)
+                }
+        }
+}
+
+# Extract Twitter sample
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
+sampleFile(t, "twitter.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt", "r")
+twitter <- readLines(con) 
+close(con) 
+
+# Extract news sample
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
+sampleFile(n, "news.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+news <- readLines(con) 
+close(con) 
+
+# Extract blogs sample
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
+sampleFile(b, "blogs.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+blogs <- readLines(con) 
+close(con) 
+
+# Determine the size and number of words in each sample file
+samples <- data.frame(size = as.numeric(), lines = as.integer())
+samples[nrow(samples) + 1, ] = list(round(file.size("twitter.txt") / 1000000, 2), length(twitter))
+samples[nrow(samples) + 1, ] = list(round(file.size("news.txt") / 1000000, 2), length(news))
+samples[nrow(samples) + 1, ] = list(round(file.size("blogs.txt") / 1000000, 2), length(blogs))
+row.names(samples) <- c("twitter", "news", "blogs")
+samples
+
+```
+Before cleaning the data, common foreign words are extracted from samples of the German, Finnish an Russian texts.
+
+```{r foreign}
+
+# German data set
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE/de_DE.twitter.txt"
+sampleFile(t, "twitterDE.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitterDE.txt", "r")
+twitterDE <- readLines(con) 
+close(con) 
+
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE/de_DE.news.txt"
+sampleFile(n, "newsDE.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsDE.txt", "r")
+newsDE <- readLines(con) 
+close(con) 
+
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/de_DE/de_DE.blogs.txt"
+sampleFile(b, "blogsDE.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsDE.txt", "r")
+blogsDE <- readLines(con) 
+close(con) 
+
+# Create a tibble with a row for every word in every row of all 3 samples
+words <- function(twitterInput, newsInput, blogsInput) {
+        titles <- c("Twitter", "News", "Blogs")
+        samples <- list(twitterInput, newsInput, blogsInput)
+        series <- tibble()
+        
+        for(i in seq_along(titles)) {
+                clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%
+                unnest_tokens(word, text) %>%
+                mutate(source = titles[[i]]) %>%
+                select(source, everything())
+                
+                series <- rbind(series, clean)
+        }
+        
+        return(series)
+}
+
+series <- words(twitterDE, newsDE, blogsDE)
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Define a function to extract a subset of unique words in a frequency-sorted dictionary to cover a percentage of all word instances in the language
+topFeatures <- function(frequency, percent = .5) {
+        count <- 0
+        wordSum <- sum(frequency$n)
+        wordDictionary <- data.frame(word = as.character(""), stringsAsFactors = FALSE)
+        
+        for(i in 1:length(frequency$n)) {
+        count <- count + frequency$n[i]
+        wordDictionary$word[i] <- frequency$word[i]
+
+        if(count / wordSum >= percent) {
+                return(wordDictionary)
+        }
+        
+        wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
+        }
+}
+
+topFeaturesDE <- topFeatures(frequency, percent = .5)
+
+
+# Finnish data set
+
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI/fi_FI.twitter.txt"
+sampleFile(t, "twitterFI.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitterFI.txt", "r")
+twitterFI <- readLines(con) 
+close(con) 
+
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI/fi_FI.news.txt"
+sampleFile(n, "newsFI.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsFI.txt", "r")
+newsFI <- readLines(con) 
+close(con) 
+
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/fi_FI/fi_FI.blogs.txt"
+sampleFile(b, "blogsFI.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsFI.txt", "r")
+blogsFI <- readLines(con) 
+close(con) 
+
+# Create a tibble with a row for every word in every row of all 3 samples
+series <- words(twitterFI, newsFI, blogsFI)
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Find the subset of unique words in a frequency-sorted dictionary
+# to cover 50% of all word instances in the language
+topFeaturesFI <- topFeatures(frequency, percent = .5)
+
+
+# Russian data set 
+
+t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.twitter.txt"
+sampleFile(t, "twitterRU.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitterRU.txt", "r")
+twitterRU <- readLines(con) 
+close(con) 
+
+n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.news.txt"
+sampleFile(n, "newsRU.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/newsRU.txt", "r")
+newsRU <- readLines(con) 
+close(con) 
+
+b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/ru_RU/ru_RU.blogs.txt"
+sampleFile(b, "blogsRU.txt", header = FALSE)
+
+con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogsRU.txt", "r")
+blogsRU <- readLines(con) 
+close(con) 
+
+# Create a tibble with a row for every word in every row of all 3 samples
+series <- words(twitterRU, newsRU, blogsRU)
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Find the subset of unique words in a frequency-sorted dictionary
+# to cover 50% of all word instances in the language
+topFeaturesRU <- topFeatures(frequency, percent = .5)
+
+```
+
+
+
+### Clean Text
+
+```{r clean}
+
+# Define regular expressions to clean text
+reg4 <- "\\ðÿ"
+reg5 <- "â"
+
+# Create a tibble with a row for every word in every row of all 3 samples
+titles <- c("Twitter", "News", "Blogs")
+samples <- list(twitter, news, blogs)
+series <- tibble()
+
+### ADD A FILTER TO REMOVE PUNCTUATION
+### ADD FILTERS / ANTI-JOIN TO REMOVE FOREIGN WORDS
+
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%     # Remove retweets
+                filter(!str_detect(text, "&amp;|&lt;|&gt;")) %>%   # Remove twitter characters 
+                filter(!str_detect(text, "[0-9]+")) %>% # Remove numbers
+                unnest_tokens(word, text) %>%
+                mutate(source = titles[[i]]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Download a list of profanities
+fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
+temp <- tempfile()
+
+if(!file.exists("profanity-list.csv")) {
+        download.file(fileURL,temp, mode="wb")
+        unzip(temp, "profanity-list.csv")
+}
+
+profanity <- read.csv("profanity-list.csv", header=FALSE)
+profanity <- as.data.frame(profanity, stringsAsFactors = FALSE)
+colnames(profanity) <- c("word")
+
+# Remove profanities
+series <- anti_join(series, profanity)
+
+# Remove common foreign words
+foreign <- as.data.frame(topFeaturesDE, stringsAsFactors = FALSE)
+foreign <- rbind(foreign, topFeaturesFI, stringsAsFactors = FALSE)
+foreign <- rbind(foreign, topFeaturesRU, stringsAsFactors = FALSE)
+colnames(foreign) <- c("word")
+
+series <- anti_join(series, foreign)
+
+# Count word frequency
+frequency <- series %>%
+        count(word, sort = TRUE)
+
+# Calculate the number of words which cover 50% and 90% of all word instances
+length(topFeatures(frequency, percent = .5)[[1]])
+length(topFeatures(frequency, percent = .9)[[1]])
+
+# Remove stop words
+series %>%
+        anti_join(stop_words) %>%
+        count(word, sort = TRUE)
+
+# Find the top 20 most common words from each source
+common <- series %>%
+        anti_join(stop_words) %>%
+        group_by(source) %>%
+        count(word, sort = TRUE) %>%
+        top_n(20)
+
+# Visualise the top 20 most common words from each source
+series %>%
+        anti_join(stop_words) %>%
+        group_by(source) %>%
+        count(word, sort = TRUE) %>%
+        top_n(20) %>%
+        ungroup() %>%
+        mutate(source = factor(source, levels = titles),
+               text_order = nrow(.):1) %>%
+        ggplot(aes(reorder(word, text_order), n, fill = source)) +
+        geom_bar(stat = "identity") +
+        facet_wrap(~ source, scales = "free_y") +
+        labs(x = "NULL", y = "Frequency") +
+        coord_flip() +
+        theme(legend.position="none")
+
+# Calculate percent of word use across all sources
+source_pct <- series %>%
+        anti_join(stop_words) %>%
+        count(word) %>%
+        transmute(word, all_words = n / sum(n))
+
+# Calculate percent of word use within each source
+frequency <- series %>%
+        anti_join(stop_words) %>%
+        count(source, word) %>%
+        mutate(source_words = n / sum(n)) %>%
+        left_join(source_pct) %>%
+        arrange(desc(source_words)) %>%
+        ungroup()
+
+frequency
+
+# Visualise
+ggplot(frequency, aes(x = source_words, y = all_words, color = abs(all_words - source_words))) +
+        geom_abline(color = "gray40", lty = 2) +
+        geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+        geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+        scale_x_log10(labels = scales::percent_format()) +
+        scale_y_log10(labels = scales::percent_format()) +
+        scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+        facet_wrap(~ source, ncol = 2) +
+        theme(legend.position="none") +
+        labs(y = "Sources", x = NULL)
+
+# Quantify how similar and different these sets of word frequencies are using 
+# a correlation test
+frequency %>%
+        group_by(source) %>%
+        summarize(correlation = cor(source_words, all_words),
+                  p_value = cor.test(source_words, all_words)$p.value)
+
+```
+
+### Explore Data
+
+```{r explore}
+
+# Sentiment?
+# Term - document frequency
+
+# WORD RELATIONSHIPS
+
+# n-gram analysis
+titles <- c("Twitter", "News", "Blogs")
+samples <- list(twitter, news, blogs)
+series <- tibble()
+
+### Need to remove profanities
+
+# Bigrams
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+                mutate(source = titles[i]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Look at the most common bi-grams across all sources
+series %>%
+        count(bigram, sort = TRUE)
+
+# Filter out common stop words, profanities and foreign words
+series %>%
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word) %>%
+        filter(!word1 %in% profanity$word,
+               !word2 %in% profanity$word) %>%
+        filter(!word1 %in% foreign$word,
+               !word2 %in% foreign$word) %>%
+        count(word1, word2, sort = TRUE)
+
+# Visualise the top 20 bigrams for each source
+series %>%
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word) %>%
+        count(source, word1, word2, sort = TRUE) %>%
+        unite("bigram", c(word1, word2), sep = " ") %>%
+        group_by(source) %>%
+        top_n(20) %>%
+        ungroup() %>%
+        mutate(source = factor(source) %>% forcats::fct_rev()) %>%
+        ggplot(aes(bigram, n, source, n, fill = source)) +
+        geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+        facet_wrap(~ source, ncol = 2, scales = "free") +
+        coord_flip() 
+
+```
+

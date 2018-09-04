@@ -28,7 +28,7 @@ After loading the data, a subset is extracted due to the large dataset. This is 
 The results ...
 
 ### Load Data
-First, a function is defined to extract a sample of data from each of the US english (en_US) twitter, news and blogs files, and the result is stored in a local file. The table shows the size (in MB) and number of lines for each sample.
+First, a function is defined to extract a sample of data from each of the US english (en_US) twitter, news and blogs files. Each of the 3 files are then sampled, and the result is stored in a local file. The table shows the size (in MB) and number of lines for each sample.
 
 ```{r load, cache=TRUE}
 
@@ -93,7 +93,138 @@ samples
 ```
 
 ### Clean Data
+First a corpus collection of the 3 documents (twitter, news and blogs samples) is created. Then the data is tokenized into words. These tokens (words) are cleaned by removing numbers, punctuation, symbols, separators such as commas, twitter handles, hyphens, url locations, profanities and stop words. Finally, the tokens are converted to lower case. From these word tokens (unigrams), bigram and trigram tokens are created to be able to analyse frequent words, two-word and three-word combinations.
 
+```{r clean}
+
+# Create a tm corpus
+myCorpus_tm <- SimpleCorpus(DirSource(directory = "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/sampledata"))
+
+# Create a quanteda corpus
+my_corpus_qu <- quanteda::corpus(myCorpus_tm)
+
+# Tokenize and clean
+my_tokens <- tokens(my_corpus_qu, remove_numbers = TRUE, remove_punct = TRUE,
+                    remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE,
+                    remove_hyphens = TRUE, remove_url = TRUE)
+
+# Remove stop words and profanities
+my_tokens <- tokens_remove(my_tokens, stopwords("english"))
+
+# Download a list of profanities
+fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
+temp <- tempfile()
+
+if(!file.exists("profanity-list.csv")) {
+        download.file(fileURL,temp, mode="wb")
+        unzip(temp, "profanity-list.csv")
+}
+
+profanity <- read.csv("profanity-list.csv", header=FALSE)
+
+my_tokens <- tokens_remove(my_tokens, profanity$V1)
+
+# Convert to lower case
+my_tokens <- tokens_tolower(my_tokens)
+
+# Remove foreign words and 1 character words
+# UPDATE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# Create n-grams - UPDATE !!!!!!!!!!!!!!!!!!
+# my_tokens_2g <- tokens_ngrams(my_tokens, n = 2L)
+# my_tokens_3g <- tokens_ngrams(my_tokens, n = 3L)
+
+my_tokens_2g <- tokens(my_corpus_qu, remove_numbers = TRUE, remove_punct = TRUE,
+                    remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE,
+                    remove_hyphens = TRUE, remove_url = TRUE, ngrams = 2L)
+
+my_tokens_3g <- tokens(my_corpus_qu, remove_numbers = TRUE, remove_punct = TRUE,
+                    remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE,
+                    remove_hyphens = TRUE, remove_url = TRUE, ngrams = 3L)
+
+# Count the number of n-grams
+num_1g <- ntoken(my_tokens)
+num_2g <- ntoken(my_tokens_2g)
+num_3g <- ntoken(my_tokens_3g)
+
+```
+
+There are `r num_1g` unigrams, `r num_2g` bigrams and `r num_3g` trigrams.
 
 ### Explore Data
 
+A document feature matrix is created for each of the n-grams - unigrams, bigrams and trigrams. The top 50 n-grams are plotted to see the most frequent n-grams. Then the n-grams which account for 50% and 90% of the total n-gram count is extracted to explore how many n-grams will be required to cover n-gram variability.
+
+```{r explore}
+
+# Create a document-feature-matrix (dfm) for each n-gram
+my_dfm <- dfm(my_tokens, stem = TRUE, valuetype = "glob")
+my_dfm_2g <- dfm(my_tokens_2g, stem = TRUE, valuetype = "glob")
+my_dfm_3g <- dfm(my_tokens_3g, stem = TRUE, valuetype = "glob")
+
+# Sort the dfm in descending order of frequency
+my_dfm <- dfm_sort(my_dfm, decreasing = TRUE, margin = "both")
+my_dfm_2g <- dfm_sort(my_dfm_2g, decreasing = TRUE, margin = "both")
+my_dfm_3g <- dfm_sort(my_dfm_3g, decreasing = TRUE, margin = "both")
+
+# Plot the top unigrams by frequency
+my_topFeatures <- topfeatures(my_dfm, 50)
+my_topDf <- data.frame(list(word = names(my_topFeatures), 
+                            frequency = unname(my_topFeatures)))
+my_topDf$word <- with(my_topDf, reorder(word, -frequency))
+ggplot(my_topDf) + geom_point(aes(x = word, y = frequency)) + 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Plot the top bigrams by frequency
+my_topFeatures_2g <- topfeatures(my_dfm_2g, 50)
+my_topDf_2g <- data.frame(list(word = names(my_topFeatures_2g), 
+                            frequency = unname(my_topFeatures_2g)))
+my_topDf_2g$word <- with(my_topDf_2g, reorder(word, -frequency))
+ggplot(my_topDf_2g) + geom_point(aes(x = word, y = frequency)) + 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Plot the top trigrams by frequency
+my_topFeatures_3g <- topfeatures(my_dfm_3g, 50)
+my_topDf_3g <- data.frame(list(word = names(my_topFeatures_3g), 
+                            frequency = unname(my_topFeatures_3g)))
+my_topDf_3g$word <- with(my_topDf_3g, reorder(word, -frequency))
+ggplot(my_topDf_3g) + geom_point(aes(x = word, y = frequency)) + 
+        theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Define a function to extract the n-grams which cover a percent of all n-gram instances
+frequentWords <- function(dfm, percent = .5) {
+        count <- 0
+        wordSum <- sum(dfm@x)
+        wordDictionary <- data.frame(word = as.character(""), stringsAsFactors = FALSE)
+
+        for(i in 1:length(dfm@Dimnames$features)) {
+           count <- count + dfm@x[i]
+           wordDictionary$word[i] <- dfm@Dimnames$features[i]
+        
+           if(count / wordSum >= percent) {
+                   return(wordDictionary)
+           }
+        
+           wordDictionary[nrow(wordDictionary) + 1, ] = as.character("")
+        }
+}
+
+unigram_50 <- frequentWords(dfm = my_dfm, percent = .5)
+unigram_90 <- frequentWords(dfm = my_dfm, percent = .9)
+
+bigram_50 <- frequentWords(dfm = my_dfm_2g, percent = .5)
+bigram_90 <- frequentWords(dfm = my_dfm_2g, percent = .9)
+
+trigram_50 <- frequentWords(dfm = my_dfm_3g, percent = .5)
+trigram_90 <- frequentWords(dfm = my_dfm_3g, percent = .9)
+
+
+```
+
+### Plan for Model Build
+
+My plan is to explore the following 
+- Use word stemming to reduce the number of features required
+- Use a dictionary and thesaurus to reduce the number of words
+- Decide whether to use 2-grams, 3-grams or 4-grams
+- Investigate how to efficiently store an n-gram model
