@@ -13,7 +13,6 @@ library(stringr)        # text cleaning and regular expressions
 library(tidytext)       # provides additional text mining functions
 library(quanteda)       # quantitative analysis of text
 library(tm)             # quantitative analysis of text
-library(textcat)        # NOTE SURE IF THIS IS NEEDED
 
 ```
 
@@ -241,9 +240,27 @@ The text is cleaned by removing retweets, special characters used in tweets, num
 
 ```{r clean}
 
-# Define regular expressions to clean text
-reg4 <- "\\ðÿ"
-reg5 <- "â"
+# Clean text of special characters and numbers
+twitter <- gsub("&amp;|&lt;|&gt;", "", twitter, ignore.case = TRUE) # special characters
+twitter <- gsub("[0-9]+", "", twitter) # numbers
+twitter <- gsub("ðÿ", "", twitter, fixed = TRUE) # special characters
+twitter <- gsub("â", "", twitter, fixed = TRUE) # special characters
+twitter <- gsub("\'", "", twitter) # apostrophes
+twitter <- gsub("[^a-zA-Z]", " ", twitter)
+
+news <- gsub("&amp;|&lt;|&gt;", "", news, ignore.case = TRUE) # special characters
+news <- gsub("[0-9]+", "", news) # numbers
+news <- gsub("ðÿ", "", news, fixed = TRUE) # special characters
+news <- gsub("â", "", news, fixed = TRUE) # special characters
+news <- gsub("\'", "", news) # apostrophes
+news <- gsub("[^a-zA-Z]", " ", news)
+
+blogs <- gsub("&amp;|&lt;|&gt;", "", blogs, ignore.case = TRUE) # special characters
+blogs <- gsub("[0-9]+", "", blogs) # numbers
+blogs <- gsub("ðÿ", "", blogs, fixed = TRUE) # special characters
+blogs <- gsub("â", "", blogs, fixed = TRUE) # special characters
+blogs <- gsub("\'", "", blogs) # apostrophes
+blogs <- gsub("[^a-zA-Z]", " ", blogs)
 
 # Create a tibble with a row for every word in every row of all 3 samples
 titles <- c("Twitter", "News", "Blogs")
@@ -255,8 +272,6 @@ for(i in seq_along(titles)) {
         clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
                 filter(!str_detect(text, "^RT")) %>%     # Remove retweets
-                filter(!str_detect(text, "&amp;|&lt;|&gt;")) %>%   # Remove twitter characters 
-                filter(!str_detect(text, "[0-9]+")) %>% # Remove numbers
                 unnest_tokens(word, text) %>%
                 mutate(source = titles[[i]]) %>%
                 select(source, everything())
@@ -388,10 +403,6 @@ for(i in seq_along(titles)) {
         clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
                 filter(!str_detect(text, "^RT")) %>%     # Remove retweets
-                filter(!str_detect(text, "&amp;|&lt;|&gt;")) %>%   # Remove twitter characters 
-                filter(!str_detect(text, "[0-9]+")) %>%   # remove numbers
-                filter(!str_detect(text, "\'")) %>%   # remove punctuation
-                filter(str_detect(text, "[a-zA-Z]+")) %>%   # remove non alphabetic characters
                 unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
                 mutate(source = titles[i]) %>%
                 select(source, everything())
@@ -412,10 +423,8 @@ series %>%
                !word2 %in% profanity$word) %>%
         filter(!word1 %in% foreign$word,
                !word2 %in% foreign$word) %>%
-        filter(!word1 %in% "NA",
-               !word2 %in% "NA") %>%
-        filter(!word1 %in% "ðÿ",
-               !word2 %in% "ðÿ") %>%
+        filter(!word1 %in% NA,
+               !word2 %in% NA) %>%
         count(word1, word2, sort = TRUE)
 
 # Visualise the top 20 bigrams for each source
@@ -427,6 +436,8 @@ series %>%
                !word2 %in% profanity$word) %>%
         filter(!word1 %in% foreign$word,
                !word2 %in% foreign$word) %>%
+        filter(!word1 %in% NA,
+               !word2 %in% NA) %>%
         count(source, word1, word2, sort = TRUE) %>%
         unite("bigram", c(word1, word2), sep = " ") %>%
         group_by(source) %>%
@@ -517,8 +528,6 @@ for(i in seq_along(titles)) {
         clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
                 filter(!str_detect(text, "^RT")) %>%     # Remove retweets
-                filter(!str_detect(text, "&amp;|&lt;|&gt;")) %>%   # Remove twitter characters 
-                filter(!str_detect(text, "[0-9]+")) %>%
                 unnest_tokens(trigram, text, token = "ngrams", n = 3) %>%
                 mutate(source = titles[i]) %>%
                 select(source, everything())
@@ -542,6 +551,9 @@ series %>%
         filter(!word1 %in% foreign$word,
                !word2 %in% foreign$word,
                !word3 %in% foreign$word) %>%
+        filter(!word1 %in% NA,
+               !word2 %in% NA,
+               !word3 %in% NA) %>%
         count(word1, word2, word3, sort = TRUE)
 
 # Visualise the top 10 tri-grams for each source
@@ -556,6 +568,9 @@ series %>%
         filter(!word1 %in% foreign$word,
                !word2 %in% foreign$word,
                !word3 %in% foreign$word) %>%
+         filter(!word1 %in% NA,
+               !word2 %in% NA,
+               !word3 %in% NA) %>%
         count(source, word1, word2, word3, sort = TRUE) %>%
         unite("trigram", c(word1, word2, word3), sep = " ") %>%
         group_by(source) %>%
