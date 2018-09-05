@@ -18,11 +18,11 @@ library(textcat)        # NOTE SURE IF THIS IS NEEDED
 ```
 
 ### Overview
-The objective is to develop a model to predict the next word a user will enter after having typed a few words. This can be used to make a mobile app more user friendly by limiting the typing a user needs to perform.
+The objective of the project is to develop a model to predict the next word a user will enter after having typed a few words. This can be used to make a mobile app more user friendly by limiting the typing a user needs to perform.
 
 The dataset is made up of twitter, news and blog data. It was supplied by Swiftkey for the Johns Hopkins Data Science coursera capstone project, and is downloaded from [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). 
 
-After loading the data, a subset is extracted due to the large dataset. This is explored to understand the characteristics of the data. Then pre-processing is used to prepare the data before analysing word and n-gram frequencies.
+After loading the data, a subset is extracted due to the large dataset. This is explored to understand the characteristics of the data. Then pre-processing is used to prepare the data before analysing word and n-gram frequencies. Finally, the plan to build the model is explained.
 
 The results ...
 
@@ -237,6 +237,7 @@ topFeaturesRU <- topFeatures(frequency, percent = .5)
 
 
 ### Clean Text
+The text is cleaned by removing retweets, special characters used in tweets, numbers, profanities and common German, Finnish and Russian words from the data loaded in these languages. Then the most frequent words are visualised to check whether the cleaning has worked and to get an idea of what the texts are about. a simple correlation test is done to determine whether the word frequencies are similar across the twitter, news and blog sources.
 
 ```{r clean}
 
@@ -248,9 +249,6 @@ reg5 <- "â"
 titles <- c("Twitter", "News", "Blogs")
 samples <- list(twitter, news, blogs)
 series <- tibble()
-
-### ADD A FILTER TO REMOVE PUNCTUATION
-### ADD FILTERS / ANTI-JOIN TO REMOVE FOREIGN WORDS
 
 for(i in seq_along(titles)) {
         
@@ -364,9 +362,15 @@ frequency %>%
 
 ```
 
-### Explore Data
+Among the most frequent words, Twitter contains a much higher count of frequent words than the other 2 sources. The 5 most frequent words in Twitter are "love", "day", "lol", "time" and "people". "Time", "people" and "day" are almost among the most frequent words in news and blogs text.
 
-```{r explore}
+The p-values of zero for all 3 sources (twitter, news and blogs) indicate that the high frequency words in each source are also high frequency across all sources.
+
+
+### Explore Data
+The frequency of bigrams and trigrams are extracted from the data to understand common 2-word and 3-word combinations.
+
+```{r bigrams}
 
 # Sentiment?
 # Term - document frequency
@@ -378,13 +382,16 @@ titles <- c("Twitter", "News", "Blogs")
 samples <- list(twitter, news, blogs)
 series <- tibble()
 
-### Need to remove profanities
-
 # Bigrams
 for(i in seq_along(titles)) {
         
         clean <- tibble(row = seq_along(samples[[i]]),
                         text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%     # Remove retweets
+                filter(!str_detect(text, "&amp;|&lt;|&gt;")) %>%   # Remove twitter characters 
+                filter(!str_detect(text, "[0-9]+")) %>%   # remove numbers
+                filter(!str_detect(text, "\'")) %>%   # remove punctuation
+                filter(str_detect(text, "[a-zA-Z]+")) %>%   # remove non alphabetic characters
                 unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
                 mutate(source = titles[i]) %>%
                 select(source, everything())
@@ -396,7 +403,7 @@ for(i in seq_along(titles)) {
 series %>%
         count(bigram, sort = TRUE)
 
-# Filter out common stop words, profanities and foreign words
+# Filter out common stop words, profanities, foreign words and NAs
 series %>%
         separate(bigram, c("word1", "word2"), sep = " ") %>%
         filter(!word1 %in% stop_words$word,
@@ -405,6 +412,10 @@ series %>%
                !word2 %in% profanity$word) %>%
         filter(!word1 %in% foreign$word,
                !word2 %in% foreign$word) %>%
+        filter(!word1 %in% "NA",
+               !word2 %in% "NA") %>%
+        filter(!word1 %in% "ðÿ",
+               !word2 %in% "ðÿ") %>%
         count(word1, word2, sort = TRUE)
 
 # Visualise the top 20 bigrams for each source
@@ -412,6 +423,10 @@ series %>%
         separate(bigram, c("word1", "word2"), sep = " ") %>%
         filter(!word1 %in% stop_words$word,
                !word2 %in% stop_words$word) %>%
+        filter(!word1 %in% profanity$word,
+               !word2 %in% profanity$word) %>%
+        filter(!word1 %in% foreign$word,
+               !word2 %in% foreign$word) %>%
         count(source, word1, word2, sort = TRUE) %>%
         unite("bigram", c(word1, word2), sep = " ") %>%
         group_by(source) %>%
@@ -422,6 +437,156 @@ series %>%
         geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
         facet_wrap(~ source, ncol = 2, scales = "free") +
         coord_flip() 
+
+# Identify the tf-idf of n-grams
+bigram_tf_idf <- series %>%
+        count(source, bigram, sort = TRUE) %>%
+        bind_tf_idf(bigram, source, n) %>%
+        arrange(desc(tf_idf))
+
+# Visualise the bigrams with the highest tf-idf for each source
+bigram_tf_idf %>%
+        group_by(source) %>%
+        top_n(15, wt = tf_idf) %>%
+        ungroup() %>%
+        mutate(source = factor(source) %>% forcats::fct_rev()) %>%
+        ggplot(aes(bigram, tf_idf, fill = source)) +
+        geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+        labs(title = "Highest tf-idf bi-grams",
+             x = NULL, y = "tf-idf") +
+        facet_wrap(~source, ncol = 2, scales = "free") +
+        coord_flip()
+
+# Perform sentiment analysis on bi-gram data
+series %>%
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(word1 == "not") %>%
+        count(source, word1, word2, sort = TRUE)
+
+AFINN <- get_sentiments("afinn")
+
+nots <- series %>%
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(word1 == "not") %>%
+        inner_join(AFINN, by = c(word2 = "word")) %>%
+        count(word2, score, sort = TRUE) 
+
+nots %>%
+        mutate(contribution = n * score) %>%
+        arrange(desc(abs(contribution))) %>%
+        head(20) %>%
+        ggplot(aes(reorder(word2, contribution), n * score, fill = n * score > 0)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        xlab("Words preceded by 'not'") +
+        ylab("Sentiment score * # of occurrances") +
+        coord_flip()
+
+negation_words <- c("not", "no", "never", "without")
+
+negated <- series %>%
+        separate(bigram, c("word1", "word2"), sep = " ") %>%
+        filter(word1 %in% negation_words) %>%
+        inner_join(AFINN, by = c(word2 = "word")) %>%
+        count(word1, word2, score, sort = TRUE) %>%
+        ungroup()
+
+# Visualise
+negated %>%
+        mutate(contribution = n * score) %>%
+        arrange(desc(abs(contribution))) %>%
+        group_by(word1) %>%
+        top_n(10, abs(contribution)) %>%
+        ggplot(aes(word2, contribution, fill = contribution > 0)) +
+        geom_bar(stat = "identity", show.legend = FALSE) +
+        xlab("Words preceded by 'not'") +
+        ylab("Sentiment score * # of occurrances") +
+        facet_wrap(~ word1, scales = "free") +
+        coord_flip()
+
+
+```
+
+
+```{r trigrams}
+
+# Create trigrams
+series <- tibble()
+
+for(i in seq_along(titles)) {
+        
+        clean <- tibble(row = seq_along(samples[[i]]),
+                        text = samples[[i]]) %>%
+                filter(!str_detect(text, "^RT")) %>%     # Remove retweets
+                filter(!str_detect(text, "&amp;|&lt;|&gt;")) %>%   # Remove twitter characters 
+                filter(!str_detect(text, "[0-9]+")) %>%
+                unnest_tokens(trigram, text, token = "ngrams", n = 3) %>%
+                mutate(source = titles[i]) %>%
+                select(source, everything())
+        
+        series <- rbind(series, clean)
+}
+
+# Look at the most common tri-grams across all sources
+series %>%
+        count(trigram, sort = TRUE)
+
+# Filter out common stop words
+series %>%
+        separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word,
+               !word3 %in% stop_words$word) %>% 
+        filter(!word1 %in% profanity$word,
+               !word2 %in% profanity$word,
+               !word3 %in% profanity$word) %>%
+        filter(!word1 %in% foreign$word,
+               !word2 %in% foreign$word,
+               !word3 %in% foreign$word) %>%
+        count(word1, word2, word3, sort = TRUE)
+
+# Visualise the top 10 tri-grams for each source
+series %>%
+        separate(trigram, c("word1", "word2", "word3"), sep = " ") %>%
+        filter(!word1 %in% stop_words$word,
+               !word2 %in% stop_words$word,
+               !word3 %in% stop_words$word) %>%
+        filter(!word1 %in% profanity$word,
+               !word2 %in% profanity$word,
+               !word3 %in% profanity$word) %>%
+        filter(!word1 %in% foreign$word,
+               !word2 %in% foreign$word,
+               !word3 %in% foreign$word) %>%
+        count(source, word1, word2, word3, sort = TRUE) %>%
+        unite("trigram", c(word1, word2, word3), sep = " ") %>%
+        group_by(source) %>%
+        top_n(10) %>%
+        ungroup() %>%
+        mutate(source = factor(source) %>% forcats::fct_rev()) %>%
+        ggplot(aes(trigram, n, source, n, fill = source)) +
+        geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+        facet_wrap(~ source, ncol = 2, scales = "free") +
+        coord_flip()
+
+# Identify the tf-idf of n-grams
+trigram_tf_idf <- series %>%
+        count(source, trigram, sort = TRUE) %>%
+        bind_tf_idf(trigram, source, n) %>%
+        arrange(desc(tf_idf))
+
+# Visualise the tri-grams with the highest tf-idf for each source
+trigram_tf_idf %>%
+        group_by(source) %>%
+        top_n(15, wt = tf_idf) %>%
+        ungroup() %>%
+        mutate(source = factor(source) %>% forcats::fct_rev()) %>%
+        ggplot(aes(trigram, tf_idf, fill = source)) +
+        geom_bar(stat = "identity", alpha = .8, show.legend = FALSE) +
+        labs(title = "Highest tf-idf tri-grams",
+             x = NULL, y = "tf-idf") +
+        facet_wrap(~source, ncol = 2, scales = "free") +
+        coord_flip()
+
+
 
 ```
 
