@@ -605,3 +605,12 @@ trigram_tf_idf %>%
 
 ```
 
+### Plan for Model Development
+
+- Decide on n in n-gram model
+- Do not eliminate stopwords
+- Use dictionary and / or thesaurus to reduce the bag of words?
+- Use smoothing for out-of-bag words?
+- Use skip-grams?
+- Use back off techniques to establish probabilities for otherwise unseen elements of an n-gram
+
