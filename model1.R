@@ -157,6 +157,14 @@ ngram4Table <- data.table(word1 = sapply(strsplit(names(ngram4Sums), "_", fixed 
                           word4 = sapply(strsplit(names(ngram4Sums), "_", fixed = TRUE), '[[', 4),
                           count = ngram4Sums)
 
+# Index the n-grams to improve performance
+
+
+# Kneser-Key smoothing???
+
+
+
+
 
 
 
