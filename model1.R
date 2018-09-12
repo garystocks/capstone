@@ -11,17 +11,21 @@ require(dplyr)
 
 # LOAD DATA ----------------------------------------------------------------------------
 
+### FOR READLINES, ADD SKIPNUL = TRUE !!!!!
+
+### LOOK AT http://rpubs.com/BParisi83/DSCapstoneW2
+
 # Load 100% of files
 t <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt", "r")
-twitter <- readLines(t)
+twitter <- readLines(t, skipNul = TRUE)
 close(t)
 
 n <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt", "r")
-news <- readLines(n)
+news <- readLines(n, skipNul = TRUE)
 close(n)
 
 b <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt", "r")
-blogs <- readLines(b)
+blogs <- readLines(b, skipNul = TRUE)
 close(b)
 
 # CLEAN TEXT ---------------------------------------------------------------------------
@@ -121,11 +125,17 @@ ngram1 <- parallelizeTask(makeTokens, sentences, 1)
 ngram2 <- parallelizeTask(makeTokens, sentences, 2)
 ngram3 <- parallelizeTask(makeTokens, sentences, 3)
 ngram4 <- parallelizeTask(makeTokens, sentences, 4)
+ngram5 <- parallelizeTask(makeTokens, sentences, 5)
+ngram6 <- parallelizeTask(makeTokens, sentences, 6)
 
-dfm1 <- parallelizeTask(dfm, ngram1, ignoredFeatures=profanity)
-dfm2 <- parallelizeTask(dfm, ngram2, ignoredFeatures=profanity)
-dfm3 <- parallelizeTask(dfm, ngram3, ignoredFeatures=profanity)
-dfm4 <- parallelizeTask(dfm, ngram4, ignoredFeatures=profanity)
+
+dfm1 <- parallelizeTask(dfm, ngram1, remove=profanity)
+dfm2 <- parallelizeTask(dfm, ngram2, remove=profanity)
+dfm3 <- parallelizeTask(dfm, ngram3, remove=profanity)
+dfm4 <- parallelizeTask(dfm, ngram4, remove=profanity)
+dfm5 <- parallelizeTask(dfm, ngram5, remove=profanity)
+dfm6 <- parallelizeTask(dfm, ngram6, remove=profanity)
+
 
 # Delete singletons
 dfm1 <- dfm_trim(dfm1, min_termfreq = 2, termfreq_type = "count")
@@ -158,14 +168,261 @@ ngram4Table <- data.table(word1 = sapply(strsplit(names(ngram4Sums), "_", fixed 
                           count = ngram4Sums)
 
 # Index the n-grams to improve performance
+setkey(ngram1Table, word1)
+setkey(ngram2Table, word1, word2)
+setkey(ngram3Table, word1, word2, word3)
 
 
+# BACK OFF MODEL ----------------------------------------------------------------------
+
+# Set discounts
+gamma2 <- .5 # bigram discount
+gamma3 <- .5 # trigram discount
+inputText <- "zoo with"
+
+# Define function to return observed trigrams and their frequencies
+getTrigrams_obs <- function(inputText, trigrams) {
+        trigramsFound <- data.table(ngrams = vector(mode = "character", length = 0),
+                                    count = vector(mode = "integer", length = 0))
+        regex <- sprintf("%s%s%s", "^", inputText, "_")
+        trigramIndices <- grep(regex, trigrams$ngram)
+        if(length(trigramIndices) > 0 ) {
+                trigramsFound <- trigramsFound[trigramIndices, ]
+        }
+        return(trigramsFound)
+}
+
+# Define function to calculate probability of observed trigrams that start with bigram inputText
+getTrigrams_probs <- function(Trigrams_obs, bigrams, inputText, trigramDisc = .5) {
+        if(nrow(Trigrams_obs) < 1) return(NULL)
+        obsCount <- filter(bigrams, ngrams == inputText)$count[1]
+        obsTrigramProbs <- mutate(Trigrams_obs, count = ((count - trigramDisc) / obsCount))
+        colnames(obsTrigramProbs) <- c("ngram", "prob")
+        
+        return(obsTrigramProbs)
+}
+
+# Get trigrams and counts
+obsTrigrams <- getTrigrams_obs(inputText, ngram3Table)
+
+# Convert counts to probabilities
+qboObsTrigrams <- getTrigrams_probs(obsTrigrams, ngram2Table, inputText, gamma3)
+qboObsTrigrams
+
+# Calculate probabilities of words completing unobserved trigrams
+
+# Get tail words of unobserved trigrams that start with the first 2 words of obsTrigrams
+getUnobservedTrigramTails < function(obsTrigrams, unigrams) {
+        obsTrigramTails <- strsplit(obsTrigrams, "_", fixed = TRUE)[, 3]
+        unobservedTrigramTails <- unigrams[!(unigrams$ngram %in% obsTrigramTails), ]$ngram
+        return(unobservedTrigramTails)
+}
+
+unobservedTrigramTails <- getUnobservedTrigramTails(obsTrigrams$ngrams, ngram1Table)
+unobservedTrigramTails
+
+# Calculate discount mass probability for bigrams
+# Get the total mass discounted from all observed bigrams
+getAlphaBigram <- function(unigram, bigrams, bigramDisc = .5) {
+        # Get all bigrams that start with the unigram
+        regex <- sprintf("%s%s%s", "^", unigram$ngram[1], "_")
+        bigramsWithUnigram <- bigrams[grep(regex, bigrams$ngram), ]
+        if(nrow(bigramsWithUnigram) < 1) return(0)
+        alpha <- 1 - (sum(bigramsWithUnigram$count - bigramDisc) / unigram$count)
+        
+        return(alpha)
+}
+
+unigram <- strsplit(inputText, "_")[[1]][2]
+unigram <- ngram1Table[ngram1Table$ngram == unigram, ]
+alphaBigram <- getAlphaBigram(unigram, ngram2Table, gamma2)
+alphaBigram
+
+# Get backed off bigrams
+getBoBigrams < - function(inputText, unobservedTrigramTails) {
+        w_i_minus1 <- strsplit(inputText, "_")[[1]][2]
+        boBigrams <- paste(w_i_minus1, unobservedTrigramTails, sep = "_")
+        return(boBigrams)
+}
+
+# 
+getObservedBoBigrams <- function(inputText, unobservedTrigramTails, ngram2Table) {
+        boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
+        observedBoBigrams <- ngram2Table[ngram2Table$ngram %in% boBigrams, ]
+        return(observedBoBigrams)
+}
+
+# Get backed off bigrams which are unobserved
+getUnobservedBoBigrams <- function(inputText, unobservedTrigramTails, observedBoBigrams) {
+        boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
+        unobservedBigrams <- boBigrams[!(boBigrams %in% observedBoBigrams$ngram)]
+        return(unobservedBigrams)
+}
+
+# Calculate q_bo(w1 | w2)
+getObservedBigramProbs <- function(observedBoBigrams, unigrams, bigramDisc = .5) {
+        word1 <- strsplit(observedBoBigrams, "_", fixed = TRUE)[, 1]
+        word1Count <- unigrams[unigrams$ngram %in% word1, ]
+        observedBigramProbs <- (observedBoBigrams$count - bigramDisc) / word1Count$count
+        observedBigramProbs <- data.table(ngram = observedBoBigrams$ngram, prob = observedBigramProbs)
+        
+        return(observedBigramProbs)
+}
+
+# Calculate q_bo(w1 | w2) for unobserved bigrams
+getqBoUnobservedBigrams <- function(unobservedBoBigrams, ngram1Table, alphaBigram) {
+        # get unobserved bigram tails
+        qBoUnobservedBigrams <- strsplit(unobservedBoBigrams, "_", fixed = TRUE)[, 2]
+        w_in_Aw_iminus1 <- ngram1Table[!ngram1Table$ngram %in% qBoUnobservedBigrams, ]
+        # convert to data table with counts
+        qBoUnobservedBigrams <- ngram1Table[ngram1Table$ngram %in% qBoUnobservedBigrams, ]
+        denom <- sum(qBoUnobservedBigrams)
+        # convert counts to probabilities
+        qBoUnobservedBigrams <- data.table(ngram = unobservedBoBigrams, prob = (alphaBigram * qBoUnobservedBigrams$count / denom))
+        
+        return(qBoUnobservedBigrams)
+}
+
+boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
+# Separate according to different formulae
+observedBoBigrams <- getObservedBoBigrams(inputText, unobservedTrigramTails, ngram2Table)
+unobservedBigrams <- getUnobservedBoBigrams(inputText, unobservedTrigramTails, observedBoBigrams)
+# calculate observed bigram probabilities
+qBoObservedBigrams <- getObservedBigramProbs(observedBoBigrams, ngram1Table, gamma2)
+
+unigram <- strsplit(inputText, "_")[[1]][2]
+unigram <- ngram1Table[ngram1Table$ngram == unigram, ]
+
+# Distribute discounted bigram probability mass to unobserved bigrams in proportion to unigram MLE
+qBoUnobservedBigrams <- getqBoUnobservedBigrams(unobservedBoBigrams, ngram1Table, alphaBigram)
+qBoBigrams <- rbind(qBoObservedBigrams, qBoUnobservedBigrams)
+qBoBigrams 
+
+# Calculate discounted probability mass for trigrams
+# Get total probability mass for all observed trigrams
+getAlphaTrigram <- function(observedTrigrams, bigram, trigramDisc = .5) {
+        if(nrow(observedTrigrams) < 1) return(1)
+        alphaTrigram <- 1 - sum((observedTrigrams$count - trigramDisc) / bigram$count[1])
+        
+        return(alphaTrigram)
+}
+
+bigram <- ngram2Table[ngram2Table$ngram %in% inputText, ]
+alphaTrigram <- getAlphaTrigram(observedTrigrams, bigram, gamma3)
+alphaTrigram
+
+# Calculate unobserved trigram probabilities
+getUnobservedTrigramProbs <- function(inputText, qBoObservedBigrams, qBoUnobservedBigrams, alphaTrigram) {
+        qBoBigrams <- rbind(qBoBigrams, qBoUnobservedBigrams)
+        qBoBigrams <- qBoBigrams[order(-qBoBigrams$prob), ]
+        sumqBoBigrams <- sum(qBoBigrams$prob)
+        word1 <- strsplit(inputText, "_")[[1]][1]
+        unobservedTrigramNgrams <- paste(word1, qBoBigrams$ngram, sep = "_")
+        unobservedTrigramProbs <- alphaTrigram * qBoBigrams$prob / sumqBoBigrams
+        unobservedTrigramsDT <- data.table(ngram = unobservedTrigramNgrams, prob = unobservedTrigramProbs)
+        
+        return(unobservedTrigramsDT)
+}
+
+qBoUnobservedTrigrams <- getUnobservedTrigramProbs(inputText, qBoObservedBigrams, qBoUnobservedBigrams, alphaTrigram)
+qBoUnobservedTrigrams
+
+# Select word with the highest probability
+getPrediction <- function(qBoTrigrams) {
+        # find tail word of highest probability trigram
+        prediction <- strsplit(qBoTrigrams$ngram[1], "_")[[1]][3]
+        result <- sprintf("%s%s%s%.4f", "highest prob prediction is >>> ", prediction,
+                          " <<< which has probability = ", qBoTrigrams$prob[1])
+        
+        return(result)
+}
+
+qBoTrigrams <- rbind(qBoObservedTrigrams, qBoUnobservedTrigrams)
+qBoTrigrams <- qBoTrigrams[order(-qBoTrigrams$prob), ]
+output <- getPrediction(qBoTrigrams)
+output
+
+
+### -----------------------------------------------------------------------------------
 # Kneser-Key smoothing???
+discount <- .75
+
+# Find number of bigram words
+ngram2Total <- nrow(ngram2Table[by = .(word1, word2)])
+
+# Divide the number of times word 2 occurs as the second part of the bigram by the total number of bigrams 
+ckn <- ngram2Table[, .(Prob = ((.N) / ngram2Total)), by = word2]
+setkey(ckn, word2)
+
+# Assign the probabilities as the second word of bigram to unigrams
+ngram1Table[, Prob := ckn[word1, Prob]]
+ngram1Table <- ngram1Table[!is.na(ngram1Table$Prob)]
+
+# Find the number of times word 1 occurred as word 1 of bigrams
+n1wi <- ngram2Table[, .(N = .N), by = word1]
+setkey(n1wi, word1)
+
+# Assign the total times word 1 occured to bigram cn1
+ngram2Table[, Cn1 := ngram1Table[word1, count]]
+
+# Kneser Kney Algorithm
+ngram2Table[, Prob := ((count - discount) / Cn1 + 
+                            discount / Cn1 * n1wi[word1, N] * ngram1Table[word2, Prob])]
 
 
+# Find the count of word1-word2 combinations in bigrams 
+ngram3Table[, Cn2 := ngram2Table[.(word1, word2), count]]
 
+# Finding count of word1-word2 combination in trigram
+n1w12 <- ngram3Table[, .N, by = .(word1, word2)]
+setkey(n1w12, word1, word2)
 
+# Kneser Kney Algorithm
+ngram3Table[, Prob := (count - discount) / Cn2 + discount / Cn2 * n1w12[.(word1, word2), N] * ngram2Table[.(word1, word2), Prob]]
 
+# Single out 50 most used unigrams
+ngram1Table <- ngram1Table[order(-Prob)][1:50]
+
+# Prediction algorithm - function to return highly probable previous word given two successive words
+triWords <- function(w1, w2, n = 5) {
+        pwords <- ngram3Table[.(w1, w2)][order(-Prob)]
+        if (any(is.na(pwords)))
+                return(biWords(w2, n))
+        if (nrow(pwords) > n)
+                return(pwords[1:n, word3])
+        count <- nrow(pwords)
+        bwords <- biWords(w2, n)[1:(n - count)]
+        return(c(pwords[, word3], bwords))
+}
+
+# Back off to bigram - function to return highly probable previous word given a word
+biWords <- function(w1, n = 5) {
+        pwords <- ngram2Table[w1][order(-Prob)]
+        if (any(is.na(pwords)))
+                return(uniWords(n))
+        if (nrow(pwords) > n)
+                return(pwords[1:n, word2])
+        count <- nrow(pwords)
+        unWords <- uniWords(n)[1:(n - count)]
+        return(c(pwords[, word2], unWords))
+}
+
+# Back off to unigram - function to return random words from unigrams
+uniWords <- function(n = 5) {  
+        return(sample(ngram1Table[, word1], size = n))
+}
+
+# The prediction app
+getWords <- function(str){
+        require(quanteda)
+        tokens <- tokens(x = char_tolower(str))
+        tokens <- char_wordstem(rev(rev(tokens[[1]])[1:2]), language = "english")
+        
+        words <- triWords(tokens[1], tokens[2], 5)
+        chain_1 <- paste(tokens[1], tokens[2], words[1], sep = " ")
+        
+        print(words[1])
+}
 
 
 # Clean text - remove special characters, punctuation

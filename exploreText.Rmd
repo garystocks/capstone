@@ -14,13 +14,11 @@ library(tidytext)       # provides additional text mining functions
 
 ```
 
-### Overview
+### Introduction
 The objective of the capstone project is to develop a model to predict the next word a user will enter after having typed a few words. This can be used to make a mobile app more user friendly by limiting the typing a user needs to perform. The purpose of this exploratory analysis is to understand the nature of the text before building a model.
 
 The dataset is made up of twitter, news and blog data. It was supplied by Swiftkey for the Johns Hopkins Data Science coursera capstone project, and was downloaded from [here](https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip). 
 After loading the data, a subset is extracted due to the large dataset. This is explored to understand the characteristics of the data. Then pre-processing is used to prepare the data before analysing word and n-gram frequencies. Finally, the plan to build the model is explained.
-
-The results ...
 
 ### Load Data
 First, a function is defined to extract a sample of data from each of the US english (en_US) twitter, news and blogs files. Each of the 3 files are then sampled, and the result is stored in a local file. The table shows the size (in MB) and number of lines for each sample.
@@ -324,12 +322,14 @@ series %>%
 There are `r trigrams` trigrams (3-word combinations). 
 
 In summary, the sample contains:
+
 - `r unigrams` unigrams
 - `r bigrams` bigrams
 - `r trigrams` trigrams
 
 ### Plan for Model Development
 The basic plan to develop a predictive text model includes:
+
 - Do additional text cleaning on 2-character unigrams which look like abbreviations and colloquial words (e.g. 'ii', 've', 'blah')
 - Divide the text into training and testing sets
 - Create a quanteda corpus with the training data
@@ -340,4 +340,4 @@ The basic plan to develop a predictive text model includes:
 - Use back off techniques to establish probabilities for otherwise unseen elements of an n-gram
 - Decide on n in n-gram model
 - Test and refine the model
-_ Investigate ways of improving performance, such as writing the data table to a SQL table
+- Investigate ways of improving performance, such as writing the data table to a SQL table
