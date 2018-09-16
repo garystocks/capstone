@@ -11,8 +11,6 @@ require(dplyr)
 
 # LOAD DATA ----------------------------------------------------------------------------
 
-### FOR READLINES, ADD SKIPNUL = TRUE !!!!!
-
 ### LOOK AT http://rpubs.com/BParisi83/DSCapstoneW2
 
 # Load 100% of files
@@ -61,7 +59,7 @@ blogsTable <- data.table(doc = rep("Blogs", length(blogs)), text = blogs)
 l <- list(twitterTable, newsTable, blogsTable)
 textTable <- rbindlist(l)
 
-# Select a random sample of 10% for training and the remaining for testing
+# Select a random sample of 60% for training and the remaining for testing
 sampleSize <- floor(.1 * nrow(textTable))
 
 set.seed(12345)
@@ -138,10 +136,10 @@ dfm6 <- parallelizeTask(dfm, ngram6, remove=profanity)
 
 
 # Delete singletons
-dfm1 <- dfm_trim(dfm1, min_termfreq = 2, termfreq_type = "count")
-dfm2 <- dfm_trim(dfm2, min_termfreq = 2, termfreq_type = "count")
-dfm3 <- dfm_trim(dfm3, min_termfreq = 2, termfreq_type = "count")
-dfm4 <- dfm_trim(dfm4, min_termfreq = 2, termfreq_type = "count")
+# dfm1 <- dfm_trim(dfm1, min_termfreq = 2, termfreq_type = "count")
+# dfm2 <- dfm_trim(dfm2, min_termfreq = 2, termfreq_type = "count")
+# dfm3 <- dfm_trim(dfm3, min_termfreq = 2, termfreq_type = "count")
+# dfm4 <- dfm_trim(dfm4, min_termfreq = 2, termfreq_type = "count")
 
 # Create vectors with sum of frequencies for each n-gram
 ngram1Sums <- colSums(dfm1)
@@ -175,10 +173,30 @@ setkey(trigrams, word1, word2, word3)
 
 # BACK OFF MODEL ----------------------------------------------------------------------
 
+
+### DEV DATA SET - DELETE ONCE TESTED ###
+
+unigrams <- data.table(word1 = c("book", "buy", "eos", "house", "paint", "sell", "the"), 
+                       count = as.integer(c(5, 6, 8, 3, 1, 1, 8)))
+bigrams <- data.table(word1 = c("book", "buy", "house", "paint", "sell", "sos", "sos", "sos", "the", "the"),
+                      word2 = c("eos", "the", "eos", "the", "the", "buy", "paint", "sell", "book", "house"),
+                      count = as.integer(c(5, 6, 3, 1, 1, 6, 1, 1, 5, 3)))
+trigrams <- data.table(word1 = c("buy", "buy", "paint", "sell", "sos", "sos", "sos", "the", "the"),
+                       word2 = c("the", "the", "the", "the", "buy", "paint", "sell", "book", "house"),
+                       word3 = c("book", "house", "house", "book", "the", "the", "the", "eos", "eos"),
+                       count = as.integer(c(4, 2, 1, 1, 6, 1, 1, 5, 3)))
+
+setkey(unigrams, word1)
+setkey(bigrams, word1, word2)
+setkey(trigrams, word1, word2, word3)
+
+### END ###
+
+
 # Set discounts
 gamma2 <- .5 # bigram discount
 gamma3 <- .5 # trigram discount
-inputText <- "must be"
+inputText <- "sell the"
 
 # Define function to return observed trigrams and their frequencies
 getObservedTrigrams <- function(inputText, trigrams) {
@@ -197,7 +215,7 @@ getObservedTrigrams <- function(inputText, trigrams) {
 }
 
 # Define function to calculate probability of observed trigrams that start with bigram inputText
-# qBO for observed trigrams = (count_of_observed_trigram - discount) / total_bigram_count
+# Probability for observed trigrams = (count_of_observed_trigram - discount) / total_bigram_count
 getTrigramsProbs <- function(observedTrigrams, bigrams, inputText, trigramDisc = .5) {
         if(nrow(observedTrigrams) < 1) return(NULL)
         obsCount <- filter(bigrams, word1 == makeTokens(inputText)$text1[1] & word2 == makeTokens(inputText)$text1[2])$count[1]
@@ -251,7 +269,7 @@ getBoBigrams <- function(inputText, unobservedTrigramTails) {
         return(boBigrams)
 }
 
-# Get observed bigrams
+# Get observed bigrams from the set of BO bigrams
 getObservedBoBigrams <- function(inputText, unobservedTrigramTails, bigrams) {
         boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
         observedBoBigrams <- bigrams[bigrams$word1 %in% boBigrams$word1 & bigrams$word2 %in% boBigrams$word2]
@@ -267,9 +285,9 @@ getUnobservedBoBigrams <- function(inputText, unobservedTrigramTails, observedBo
 
 # Calculate q_bo(w1 | w2)
 getObservedBigramProbs <- function(observedBoBigrams, unigrams, bigramDisc = .5) {
-        word1 <- observedBoBigrams$word1
-        word1Count <- unigrams[unigrams$word1 %in% word1]
-        observedBigramProbs <- (observedBoBigrams$count - bigramDisc) / word1Count$count
+        word <- observedBoBigrams$word1[1]
+        wordCount <- unigrams[unigrams$word1 == word]
+        observedBigramProbs <- (observedBoBigrams$count - bigramDisc) / wordCount$count
         observedBigramProbs <- data.table(word1 = observedBoBigrams$word1, 
                                           word2 = observedBoBigrams$word2, 
                                           prob = observedBigramProbs)
@@ -277,7 +295,9 @@ getObservedBigramProbs <- function(observedBoBigrams, unigrams, bigramDisc = .5)
         return(observedBigramProbs)
 }
 
-# Calculate q_bo(w1 | w2) for unobserved bigrams
+################### This is where to start from ####################
+
+# Calculate q_bo(w1 | w2) for UNOBSERVED bigrams
 getqBoUnobservedBigrams <- function(unobservedBoBigrams, unigrams, alphaBigram) {
         # get unobserved bigram tails
         qBoUnobservedBigrams <- unobservedBoBigrams$word2
