@@ -159,7 +159,7 @@ trigrams <- data.table(word1 = sapply(strsplit(names(ngram3Sums), "_", fixed = T
                           word3 = sapply(strsplit(names(ngram3Sums), "_", fixed = TRUE), '[[', 3),
                           count = ngram3Sums)
 
-ngram4Table <- data.table(word1 = sapply(strsplit(names(ngram4Sums), "_", fixed = TRUE), '[[', 1),
+quadgrams <- data.table(word1 = sapply(strsplit(names(ngram4Sums), "_", fixed = TRUE), '[[', 1),
                           word2 = sapply(strsplit(names(ngram4Sums), "_", fixed = TRUE), '[[', 2),
                           word3 = sapply(strsplit(names(ngram4Sums), "_", fixed = TRUE), '[[', 3),
                           word4 = sapply(strsplit(names(ngram4Sums), "_", fixed = TRUE), '[[', 4),
@@ -169,6 +169,7 @@ ngram4Table <- data.table(word1 = sapply(strsplit(names(ngram4Sums), "_", fixed 
 setkey(unigrams, word1)
 setkey(bigrams, word1, word2)
 setkey(trigrams, word1, word2, word3)
+setkey(quadgrams, word1, word2, word3)
 
 
 # BACK OFF MODEL ----------------------------------------------------------------------
@@ -176,19 +177,19 @@ setkey(trigrams, word1, word2, word3)
 
 ### DEV DATA SET - DELETE ONCE TESTED ###
 
-unigrams <- data.table(word1 = c("book", "buy", "eos", "house", "paint", "sell", "the"), 
-                       count = as.integer(c(5, 6, 8, 3, 1, 1, 8)))
-bigrams <- data.table(word1 = c("book", "buy", "house", "paint", "sell", "sos", "sos", "sos", "the", "the"),
-                      word2 = c("eos", "the", "eos", "the", "the", "buy", "paint", "sell", "book", "house"),
-                      count = as.integer(c(5, 6, 3, 1, 1, 6, 1, 1, 5, 3)))
-trigrams <- data.table(word1 = c("buy", "buy", "paint", "sell", "sos", "sos", "sos", "the", "the"),
-                       word2 = c("the", "the", "the", "the", "buy", "paint", "sell", "book", "house"),
-                       word3 = c("book", "house", "house", "book", "the", "the", "the", "eos", "eos"),
-                       count = as.integer(c(4, 2, 1, 1, 6, 1, 1, 5, 3)))
+# unigrams <- data.table(word1 = c("book", "buy", "eos", "house", "paint", "sell", "the"), 
+#                        count = as.integer(c(5, 6, 8, 3, 1, 1, 8)))
+# bigrams <- data.table(word1 = c("book", "buy", "house", "paint", "sell", "sos", "sos", "sos", "the", "the"),
+#                       word2 = c("eos", "the", "eos", "the", "the", "buy", "paint", "sell", "book", "house"),
+#                       count = as.integer(c(5, 6, 3, 1, 1, 6, 1, 1, 5, 3)))
+# trigrams <- data.table(word1 = c("buy", "buy", "paint", "sell", "sos", "sos", "sos", "the", "the"),
+#                        word2 = c("the", "the", "the", "the", "buy", "paint", "sell", "book", "house"),
+#                        word3 = c("book", "house", "house", "book", "the", "the", "the", "eos", "eos"),
+#                        count = as.integer(c(4, 2, 1, 1, 6, 1, 1, 5, 3)))
 
-setkey(unigrams, word1)
-setkey(bigrams, word1, word2)
-setkey(trigrams, word1, word2, word3)
+# setkey(unigrams, word1)
+# setkey(bigrams, word1, word2)
+# setkey(trigrams, word1, word2, word3)
 
 ### END ###
 
@@ -196,29 +197,49 @@ setkey(trigrams, word1, word2, word3)
 # Set discounts
 gamma2 <- .5 # bigram discount
 gamma3 <- .5 # trigram discount
-inputText <- "sell the"
+gamma4 <- .5 # quadgram discount
+inputText <- "must be"
 
-# Define function to return observed trigrams and their frequencies
-getObservedTrigrams <- function(inputText, trigrams) {
+# Find OBSERVED quadgrams and the counts
+
+# Calculate the probabilities of observed quadgrams beginning with inputText
+
+# Find the tail words of UNOBSERVED quadgrams that start with the first 3 words of observedQuadgrams
+
+# Calculate the discount mass probability for trigrams
+
+# Get backed off trigrams
+
+# Find OBSERVED trigrams from BO trigrams
+
+# Find UNOBSERVED trigrams from BO trigrams
+
+# Calculate probabilities for OBSERVED BO trigrams
+
+# Calculate probabilities for UNOBSERVED BO trigrams
+
+# Distribute discounted trigram probability to UNOBSERVED trigrams in proportion to ???
+
+
+# Find OBSERVED trigrams and their counts
+getObservedTrigrams <- function(inputString, inputTrigrams) {
         trigramsFound <- data.table(word1 = vector(mode = "character", length = 0),
                                     word2 = vector(mode = "character", length = 0),
                                     word3 = vector(mode = "character", length = 0),
                                     count = vector(mode = "integer", length = 0))
-        words <- makeTokens(inputText, n = 1L)
-        trigramIndices <- trigrams[trigrams$word1 == words$text1[1] & trigrams$word2 == words$text1[2], ]
-        # regex <- sprintf("%s%s%s", "^", inputText, "_")
-        # trigramIndices <- grep(regex, trigrams$ngram)
+        words <- makeTokens(inputString, n = 1L)
+        trigramIndices <- inputTrigrams[inputTrigrams$word1 == words$text1[1] & inputTrigrams$word2 == words$text1[2], ]
         if(length(trigramIndices) > 0 ) {
                 trigramsFound <- trigramIndices[trigramIndices, c("word1", "word2", "word3", "count")]
         }
         return(trigramsFound)
 }
 
-# Define function to calculate probability of observed trigrams that start with bigram inputText
+# Calculate the probabilities of OBSERVED trigrams beginning with the bigram inputText
 # Probability for observed trigrams = (count_of_observed_trigram - discount) / total_bigram_count
-getTrigramsProbs <- function(observedTrigrams, bigrams, inputText, trigramDisc = .5) {
+getTrigramsProbs <- function(observedTrigrams, inputBigrams, inputString, trigramDisc = .5) {
         if(nrow(observedTrigrams) < 1) return(NULL)
-        obsCount <- filter(bigrams, word1 == makeTokens(inputText)$text1[1] & word2 == makeTokens(inputText)$text1[2])$count[1]
+        obsCount <- filter(inputBigrams, word1 == makeTokens(inputString)$text1[1] & word2 == makeTokens(inputString)$text1[2])$count[1]
         obsTrigramProbs <- mutate(observedTrigrams, count = ((count - trigramDisc) / obsCount))
         colnames(obsTrigramProbs) <- c("word1", "word2", "word3", "prob")
         
@@ -233,24 +254,21 @@ qBoObservedTrigrams <- getTrigramsProbs(observedTrigrams, bigrams, inputText, ga
 qBoObservedTrigrams
 
 
-# Calculate probabilities of words completing unobserved trigrams
-
-# Get tail words of unobserved trigrams that start with the first 2 words of observedTrigrams
-getUnobservedTrigramTails <- function(observedTrigrams, unigrams) {
+# Find the tail words of UNOBSERVED trigrams that start with the first 2 words of observedTrigrams
+getUnobservedTrigramTails <- function(observedTrigrams, inputUnigrams) {
         observedTrigramTails <- observedTrigrams$word3
-        unobservedTrigramTails <- unigrams[!(unigrams$word1 %in% observedTrigramTails), ]$word1
+        unobservedTrigramTails <- inputUnigrams[!(inputUnigrams$word1 %in% observedTrigramTails), ]$word1
         return(unobservedTrigramTails)
 }
 
 unobservedTrigramTails <- getUnobservedTrigramTails(observedTrigrams, unigrams)
 unobservedTrigramTails
 
-# Calculate discount mass probability for bigrams
-# Get the total mass discounted from all observed bigrams
-# alpha for observed bigrams = 1 - sum_of((observed_trigram_count - discount) / observed_bigram_count)
-getAlphaBigram <- function(unigram, bigrams, bigramDisc = .5) {
+# Calculate the discount mass probability for bigrams
+# alpha for observed bigrams = 1 - sum_of((observed_bigram_count - discount) / unigram_count)
+getAlphaBigram <- function(unigram, inputBigrams, bigramDisc = .5) {
         # Get all bigrams that start with the unigram
-        bigramsWithUnigram <- bigrams[word1 == unigram$word1]
+        bigramsWithUnigram <- inputBigrams[word1 == unigram$word1]
         if(nrow(bigramsWithUnigram) < 1) return(0)
         alpha <- 1 - (sum(bigramsWithUnigram$count - bigramDisc) / unigram$count)
         
@@ -263,30 +281,31 @@ alphaBigram <- getAlphaBigram(unigram, bigrams, gamma2)
 alphaBigram
 
 # Get backed off bigrams
-getBoBigrams <- function(inputText, unobservedTrigramTails) {
-        w_i_minus1 <- makeTokens(inputText, n = 1L)$text1[[2]]
+getBoBigrams <- function(inputString, unobservedTrigramTails) {
+        w_i_minus1 <- makeTokens(inputString, n = 1L)$text1[[2]]
         boBigrams <- data.table(word1 = rep(w_i_minus1, length(unobservedTrigramTails)), word2 = unobservedTrigramTails)
         return(boBigrams)
 }
 
-# Get observed bigrams from the set of BO bigrams
-getObservedBoBigrams <- function(inputText, unobservedTrigramTails, bigrams) {
-        boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
-        observedBoBigrams <- bigrams[bigrams$word1 %in% boBigrams$word1 & bigrams$word2 %in% boBigrams$word2]
+# Get OBSERVED bigrams from the set of BO bigrams
+getObservedBoBigrams <- function(inputString, unobservedTrigramTails, inputBigrams) {
+        boBigrams <- getBoBigrams(inputString, unobservedTrigramTails)
+        observedBoBigrams <- inputBigrams[inputBigrams$word1 %in% boBigrams$word1 & inputBigrams$word2 %in% boBigrams$word2]
         return(observedBoBigrams)
 }
 
-# Get backed off bigrams which are unobserved
-getUnobservedBoBigrams <- function(inputText, unobservedTrigramTails, observedBoBigrams) {
-        boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
+# Get UNOBSERVED bigrams from the set of BO bigrams
+getUnobservedBoBigrams <- function(inputString, unobservedTrigramTails, observedBoBigrams) {
+        boBigrams <- getBoBigrams(inputString, unobservedTrigramTails)
         unobservedBigrams <- boBigrams[!(boBigrams$word1 %in% observedBoBigrams$word1 & boBigrams$word2 %in% observedBoBigrams$word2)]
         return(unobservedBigrams)
 }
 
-# Calculate q_bo(w1 | w2)
-getObservedBigramProbs <- function(observedBoBigrams, unigrams, bigramDisc = .5) {
+# Calculate probabilities for OBSERVED BO bigrams
+# q_bo(w1 | w2)
+getObservedBigramProbs <- function(observedBoBigrams, inputUnigrams, bigramDisc = .5) {
         word <- observedBoBigrams$word1[1]
-        wordCount <- unigrams[unigrams$word1 == word]
+        wordCount <- inputUnigrams[inputUnigrams$word1 == word]
         observedBigramProbs <- (observedBoBigrams$count - bigramDisc) / wordCount$count
         observedBigramProbs <- data.table(word1 = observedBoBigrams$word1, 
                                           word2 = observedBoBigrams$word2, 
@@ -295,15 +314,14 @@ getObservedBigramProbs <- function(observedBoBigrams, unigrams, bigramDisc = .5)
         return(observedBigramProbs)
 }
 
-################### This is where to start from ####################
-
-# Calculate q_bo(w1 | w2) for UNOBSERVED bigrams
-getqBoUnobservedBigrams <- function(unobservedBoBigrams, unigrams, alphaBigram) {
+# Calculate probabilities for UNOBSERVED BO bigrams
+# q_bo(w1 | w2)
+getqBoUnobservedBigrams <- function(unobservedBoBigrams, inputUnigrams, alphaBigram) {
         # get unobserved bigram tails
         qBoUnobservedBigrams <- unobservedBoBigrams$word2
-        w_in_Aw_iminus1 <- unigrams[!unigrams$word1 %in% qBoUnobservedBigrams]
+        w_in_Aw_iminus1 <- inputUnigrams[!inputUnigrams$word1 %in% qBoUnobservedBigrams]
         # convert to data table with counts
-        qBoUnobservedBigrams <- unigrams[unigrams$word1 %in% qBoUnobservedBigrams]
+        qBoUnobservedBigrams <- inputUnigrams[inputUnigrams$word1 %in% qBoUnobservedBigrams]
         denom <- sum(qBoUnobservedBigrams$count)
         # convert counts to probabilities
         qBoUnobservedBigrams <- data.table(word1 = unobservedBoBigrams$word1, 
@@ -320,6 +338,7 @@ unobservedBoBigrams <- getUnobservedBoBigrams(inputText, unobservedTrigramTails,
 # calculate observed bigram probabilities
 qBoObservedBigrams <- getObservedBigramProbs(observedBoBigrams, unigrams, gamma2)
 
+# Why is this here????
 unigram <- makeTokens(inputText, n = 1L)$text1[[2]]
 unigram <- unigrams[unigrams$word1 == unigram]
 
@@ -329,7 +348,6 @@ qBoBigrams <- rbind(qBoObservedBigrams, qBoUnobservedBigrams)
 qBoBigrams 
 
 # Calculate discounted probability mass for trigrams
-# Get total probability mass for all observed trigrams
 getAlphaTrigram <- function(observedTrigrams, bigram, trigramDisc = .5) {
         if(nrow(observedTrigrams) < 1) return(1)
         alphaTrigram <- 1 - sum((observedTrigrams$count - trigramDisc) / bigram$count[1])
@@ -341,15 +359,15 @@ bigram <- bigrams[bigrams$word1 %in% makeTokens(inputText, n = 1L)$text1[[1]] & 
 alphaTrigram <- getAlphaTrigram(observedTrigrams, bigram, gamma3)
 alphaTrigram
 
-# Calculate unobserved trigram probabilities
-getUnobservedTrigramProbs <- function(inputText, qBoObservedBigrams, qBoUnobservedBigrams, alphaTrigram) {
+# Calculate UNOBSERVED trigram probabilities
+getUnobservedTrigramProbs <- function(inputString, qBoObservedBigrams, qBoUnobservedBigrams, alphaTrigram) {
         qBoBigrams <- rbind(qBoBigrams, qBoUnobservedBigrams)
         qBoBigrams <- qBoBigrams[order(-qBoBigrams$prob), ]
         sumqBoBigrams <- sum(qBoBigrams$prob)
-        word1 <- makeTokens(inputText, n = 1L)$text1[[1]]
+        word <- makeTokens(inputString, n = 1L)$text1[[1]]
         # unobservedTrigramNgrams <- paste(word1, qBoBigrams$ngram, sep = "_")
         unobservedTrigramProbs <- alphaTrigram * qBoBigrams$prob / sumqBoBigrams
-        unobservedTrigramsDT <- data.table(word1 = word1, word2 = qBoBigrams$word1, 
+        unobservedTrigramsDT <- data.table(word1 = word, word2 = qBoBigrams$word1, 
                                            word3 = qBoBigrams$word2, prob = unobservedTrigramProbs)
         
         return(unobservedTrigramsDT)
