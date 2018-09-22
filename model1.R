@@ -125,6 +125,10 @@ ngram3 <- parallelizeTask(makeTokens, sentences, 3)
 ngram4 <- parallelizeTask(makeTokens, sentences, 4)
 ngram5 <- parallelizeTask(makeTokens, sentences, 5)
 ngram6 <- parallelizeTask(makeTokens, sentences, 6)
+ngram7 <- parallelizeTask(makeTokens, sentences, 7)
+ngram8 <- parallelizeTask(makeTokens, sentences, 8)
+# ngram9 <- parallelizeTask(makeTokens, sentences, 9)
+# ngram10 <- parallelizeTask(makeTokens, sentences, 10)
 
 
 dfm1 <- parallelizeTask(dfm, ngram1, remove=profanity)
@@ -133,6 +137,12 @@ dfm3 <- parallelizeTask(dfm, ngram3, remove=profanity)
 dfm4 <- parallelizeTask(dfm, ngram4, remove=profanity)
 dfm5 <- parallelizeTask(dfm, ngram5, remove=profanity)
 dfm6 <- parallelizeTask(dfm, ngram6, remove=profanity)
+dfm7 <- parallelizeTask(dfm, ngram7, remove=profanity)
+dfm8 <- parallelizeTask(dfm, ngram8, remove=profanity)
+# dfm9 <- parallelizeTask(dfm, ngram9, remove=profanity)
+# dfm10 <- parallelizeTask(dfm, ngram10, remove=profanity)
+
+
 
 
 # Delete singletons
@@ -146,6 +156,12 @@ ngram1Sums <- colSums(dfm1)
 ngram2Sums <- colSums(dfm2)
 ngram3Sums <- colSums(dfm3)
 ngram4Sums <- colSums(dfm4)
+ngram5Sums <- colSums(dfm5)
+ngram6Sums <- colSums(dfm6)
+ngram7Sums <- colSums(dfm7)
+ngram8Sums <- colSums(dfm8)
+# ngram9Sums <- colSums(dfm9)
+# ngram10Sums <- colSums(dfm10)
 
 # Create data tables with individual words and n-gram count as the variables
 unigrams <- data.table(word1 = names(ngram1Sums), count = ngram1Sums)
@@ -212,6 +228,17 @@ setkey(trigrams3, word1, word2, word3)
 
 ### END ###
 
+# Quiz 2
+"The guy in front of me just bought a pound of bacon, a bouquet, and a case of"
+"You're the reason why I smile everyday. Can you follow me please? It would mean the"
+"Hey sunshine, can you follow me and make me the"
+"Very early observations on the Bills game: Offense still struggling but the"
+"Go on a romantic date at the"
+"Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my"
+"Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some"
+"After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little"
+"Be grateful for the good times and keep the faith during the"
+"If this isn't the cutest thing you've ever seen, then you must be"
 
 # Set discounts
 gamma2 <- .5 # bigram discount

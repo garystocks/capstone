@@ -15,15 +15,15 @@ require(dplyr)
 
 # Load 100% of files
 t <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt", "r")
-twitter <- readLines(t, skipNul = TRUE)
+twitter <- readLines(t, encoding='UTF-8', skipNul = TRUE)
 close(t)
 
 n <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt", "r")
-news <- readLines(n, skipNul = TRUE)
+news <- readLines(n, encoding='UTF-8', skipNul = TRUE)
 close(n)
 
 b <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt", "r")
-blogs <- readLines(b, skipNul = TRUE)
+blogs <- readLines(b, encoding='UTF-8', skipNul = TRUE)
 close(b)
 
 # CLEAN TEXT ---------------------------------------------------------------------------
