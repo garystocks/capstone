@@ -2,6 +2,7 @@
 # The strategy is to load each source (twitter, news, blogs) separately.
 # This script loads and transforms TWITTER data
 
+library(dplyr)
 library(tidytext)
 library(quanteda)
 library(data.table)
@@ -25,8 +26,11 @@ twitter <- gsub("\\.+", " EOS ", twitter) # Replace fullstops with end-of-senten
 twitter <- gsub("\\!+", " EOS ", twitter) # Replace exclamation marks with end-of-sentence marker
 twitter <- gsub("\\?+", " EOS ", twitter) # Replace question marks with end-of-sentence marker
 
-twitter <- gsub("[[:punct:,^\\']]"," ", twitter) # all punctuation except apostrophes
 twitter <- gsub("[0-9]+", "", twitter) # numbers
+twitter <- gsub("\\'", "9", twitter) # make apostrophes "9"
+twitter <- gsub("[[:punct:]]"," ", twitter) # all punctuation
+twitter <- gsub("[^a-zA-Z0-9]", " ", twitter) # replace anything not a letter or number
+twitter <- gsub("9", "\\'", twitter) # Replace "9" with apostrophe
 twitter <- gsub("&amp;|&lt;|&gt;", "", twitter, ignore.case = TRUE) # special characters
 twitter <- gsub("ðÿ", "", twitter, fixed = TRUE) # special characters
 twitter <- gsub("ð", "", twitter, fixed = TRUE) # special characters
@@ -51,6 +55,95 @@ trainIndex <- sample(seq_len(nrow(twitterTable)), size = sampleSize)
 
 twitterTraining <- twitterTable[trainIndex, ]
 twitterTesting <- twitterTable[-trainIndex, ]
+
+remove(t)
+remove(twitter)
+remove(twitterTable)
+remove(trainIndex)
+
+# Extract ngrams ---------------------------------------------------------------------------
+
+# Extract unigrams
+unigrams <- tibble(text = twitterTraining$text) %>%
+        unnest_tokens(word, text, to_lower = TRUE) %>%
+        count(word, sort = TRUE)
+
+# Delete all rows which contain "eos" as a word or in an ngram        
+unigrams <- unigrams[-(unigrams$word == "eos"), ]
+
+# Delete singletons
+unigrams <- unigrams[!(unigrams$n == 1), ]
+
+gc()
+
+# Extract bigrams
+bigrams <- tibble(text = twitterTraining$text) %>%
+        unnest_tokens(ngram, text, token = "ngrams", n = 2, to_lower = TRUE) %>%
+        count(ngram, sort = TRUE) 
+
+# Delete singletons
+bigrams <- bigrams[!(bigrams$n == 1), ]
+
+# Separate words
+bigrams <- mutate(bigrams,
+             word1 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 1),
+             word2 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 2))
+
+# Remove ngrams with "eos"
+bigrams <- bigrams[!(bigrams$word1 == "eos" | bigrams$word2 == "eos"), ]
+
+gc()
+
+# Extract trigrams
+trigrams <- tibble(text = twitterTraining$text) %>%
+        unnest_tokens(ngram, text, token = "ngrams", n = 3, to_lower = TRUE) %>%
+        count(ngram, sort = TRUE)
+
+# Delete singletons
+trigrams <- trigrams[!(trigrams$n == 1), ]
+
+# Separate words
+trigrams <- mutate(trigrams,
+                  word1 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 1),
+                  word2 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 2),
+                  word3 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 3))
+
+# Remove ngrams with "eos"
+trigrams <- trigrams[!(trigrams$word1 == "eos" | trigrams$word2 == "eos" | trigrams$word3 == "eos"), ]
+
+gc()
+
+# Extract quadgrams
+quadgrams <- tibble(text = twitterTraining$text) %>%
+        unnest_tokens(ngram, text, token = "ngrams", n = 4, to_lower = TRUE) %>%
+        count(ngram, sort = TRUE)
+
+# Delete singletons
+quadgrams <- quadgrams[!(quadgrams$n == 1), ]
+
+# Separate words
+quadgrams <- mutate(quadgrams,
+                   word1 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 1),
+                   word2 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 2),
+                   word3 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 3),
+                   word4 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 4))
+
+# Remove ngrams with "eos"
+quadgrams <- quadgrams[!(quadgrams$word1 == "eos" | quadgrams$word2 == "eos" | quadgrams$word3 == "eos" | quadgrams$word4 == "eos"), ]
+
+
+# Convert to data tables
+unigrams <- data.table(word1 = unigrams$word, count = unigrams$n)
+bigrams <- data.table(word1 = bigrams$word1, word2 = bigrams$word2, count = bigrams$n)
+trigrams <- data.table(word1 = trigrams$word1, word2 = trigrams$word2, word3 = trigrams$word3, count = trigrams$n)
+quadgrams <- data.table(word1 = quadgrams$word1, word2 = quadgrams$word2, word3 = quadgrams$word3, word4 = quadgrams$word4, count = quadgrams$n)
+
+# Index the ngrams to improve performance
+setkey(unigrams, word1)
+setkey(bigrams, word1, word2)
+setkey(trigrams, word1, word2, word3)
+setkey(quadgrams, word1, word2, word3, word4)
+
 
 # Divide TWITTER data into 3------------------------------------------------------------
 
@@ -223,7 +316,7 @@ parallelizeTask <- function(task, ...) {
         r
 }
 
-# Index the n-grams to improve performance
+# Index the ngrams to improve performance
 setkey(unigrams, word1)
 setkey(bigrams, word1, word2)
 setkey(trigrams, word1, word2, word3)
@@ -280,6 +373,8 @@ getQuadgramsProbs <- function(observedQuadgrams, inputTrigrams, inputString, qua
         
         return(obsQuadgramProbs)
 }
+
+qObservedQuadgrams <- getQuadgramsProbs(observedQuadgrams, trigrams, inputText, gamma4)
 
 # Find the tail words of UNOBSERVED quadgrams that start with the first 3 words of observedQuadgrams
 getUnobservedQuadgramTails <- function(observedQuadgrams, inputUnigrams) {
