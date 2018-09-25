@@ -61,11 +61,25 @@ remove(twitter)
 remove(twitterTable)
 remove(trainIndex)
 
+# Get a list of profanities -------------------------------------------------------------
+
+# Download a list of profanities to remove
+fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
+temp <- tempfile()
+
+if(!file.exists("profanity-list.csv")) {
+        download.file(fileURL,temp, mode="wb")
+        unzip(temp, "profanity-list.csv")
+}
+
+profanity <- read.csv("profanity-list.csv", header=FALSE)
+
 # Extract ngrams ---------------------------------------------------------------------------
 
 # Extract unigrams
 unigrams <- tibble(text = twitterTraining$text) %>%
         unnest_tokens(word, text, to_lower = TRUE) %>%
+        filter(!word %in% profanity$V1) %>%
         count(word, sort = TRUE)
 
 # Delete all rows which contain "eos" as a word or in an ngram        
@@ -89,6 +103,9 @@ bigrams <- mutate(bigrams,
                   word1 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 1),
                   word2 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 2))
 
+# Remove profanities
+bigrams <- bigrams[!(bigrams$word1 %in% profanity$V1 | bigrams$word2 %in% profanity$V1), ]
+
 # Remove ngrams with "eos"
 bigrams <- bigrams[!(bigrams$word1 == "eos" | bigrams$word2 == "eos"), ]
 
@@ -107,6 +124,9 @@ trigrams <- mutate(trigrams,
                    word1 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 1),
                    word2 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 2),
                    word3 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 3))
+
+# Remove profanity
+trigrams <- trigrams[!(trigrams$word1 %in% profanity$V1 | trigrams$word2 %in% profanity$V1 | trigrams$word3 %in% profanity$V1), ]
 
 # Remove ngrams with "eos"
 trigrams <- trigrams[!(trigrams$word1 == "eos" | trigrams$word2 == "eos" | trigrams$word3 == "eos"), ]
@@ -128,6 +148,9 @@ quadgrams <- mutate(quadgrams,
                     word3 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 3),
                     word4 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 4))
 
+# Remove profanity
+quadgrams <- quadgrams[!(quadgrams$word1 %in% profanity$V1 | quadgrams$word2 %in% profanity$V1 | quadgrams$word3 %in% profanity$V1 | quadgrams$word4 %in% profanity$V1), ]
+
 # Remove ngrams with "eos"
 quadgrams <- quadgrams[!(quadgrams$word1 == "eos" | quadgrams$word2 == "eos" | quadgrams$word3 == "eos" | quadgrams$word4 == "eos"), ]
 
@@ -144,18 +167,6 @@ setkey(bigrams, word1, word2)
 setkey(trigrams, word1, word2, word3)
 setkey(quadgrams, word1, word2, word3, word4)
 
-# Remove profanities ----------------------------------------------------------------
-
-# Download a list of profanities to remove
-fileURL <- "https://community.jivesoftware.com/servlet/JiveServlet/download/1907-1-3237/profanity-list.zip"
-temp <- tempfile()
-
-if(!file.exists("profanity-list.csv")) {
-        download.file(fileURL,temp, mode="wb")
-        unzip(temp, "profanity-list.csv")
-}
-
-profanity <- read.csv("profanity-list.csv", header=FALSE)
 
 # -----------------------------------------------------------------------------------
 # Define a function to create tokens
