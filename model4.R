@@ -197,7 +197,7 @@ gamma2 <- .5 # bigram discount
 gamma3 <- .5 # trigram discount
 gamma4 <- .5 # quadgram discount
 
-inputText <- "struggling but the"
+inputText <- "a case of"
 
 # Find OBSERVED quadgrams and the counts
 getObservedQuadgrams <- function(inputString, inputQuadgrams) {
@@ -267,12 +267,12 @@ boTrigrams <- getBoTrigrams(inputText, unobservedQuadgramTails)
 # Find OBSERVED trigrams from BO trigrams
 getObservedBoTrigrams <- function(inputString, unobservedQuadgramTails, inputTrigrams) {
         boTrigrams <- getBoTrigrams(inputString, unobservedQuadgramTails)
-        # MUTATE with ngram col boTrigrams$ngram <- paste(boTrigrams$word1, " ", boTrigrams$word2, " ", boTrigrams$word3)
-        # MUTATE with ngram col allTrigrams$ngram <- paste(inputTrigrams$word1, " ", inputTrigrams$word2, " ", inputTrigrams$word3)
-        # obsBoTrigramsIndices <- allTrigrams[allTrigrams$ngram == boTrigrams$ngram]
-        observedBoTrigrams <- inputTrigrams[inputTrigrams$word1 %in% boTrigrams$word1 & 
-                                                    inputTrigrams$word2 %in% boTrigrams$word2 &
-                                                    inputTrigrams$word3 %in% boTrigrams$word3]
+        # Concatenate words to create an n-gram column
+        boTrigrams <- mutate(boTrigrams, ngram = paste(boTrigrams$word1, boTrigrams$word2, boTrigrams$word3))
+        # Concatenate words to create an n-gram column
+        inputTrigrams <- mutate(inputTrigrams, ngram = paste(inputTrigrams$word1, inputTrigrams$word2, inputTrigrams$word3))
+        observedBoTrigrams <- inputTrigrams[inputTrigrams$ngram %in% boTrigrams$ngram, ]
+        observedBoTrigrams <- observedBoTrigrams[, !(names(observedBoTrigrams) %in% "ngram")]
         return(observedBoTrigrams)
 }
 
@@ -289,7 +289,7 @@ getObservedBoTrigramProbs <- function(observedBoTrigrams, inputBigrams, inputStr
         return(obsTrigramProbs)
 }
 
-qObservedBoTrigram <- getObservedBoTrigramProbs(observedBoTrigrams, bigrams, inputText, gamma3)
+qObservedBoTrigrams <- getObservedBoTrigramProbs(observedBoTrigrams, bigrams, inputText, gamma3)
 
 # Calculate the discount mass probability to redistribute to bigrams
 getAlphaTrigram <- function(observedBoTrigrams, bigram, trigramDisc = .5) {
@@ -305,9 +305,11 @@ alphaTrigram <- getAlphaTrigram(observedBoTrigrams, bigram, gamma3)
 
 # Find UNOBSERVED trigrams from BO trigrams
 getUnobservedBoTrigrams <- function(boTrigrams, inputString, observedBoTrigrams) {
-        unobservedTrigrams <- boTrigrams[!(boTrigrams$word1 == observedBoTrigrams$word1 & 
-                                                   boTrigrams$word2 == observedBoTrigrams$word2 &
-                                                   boTrigrams$word3 == observedBoTrigrams$word3)]
+        # Concatenate words to create an n-gram column
+        boTrigrams <- mutate(boTrigrams, ngram = paste(boTrigrams$word1, boTrigrams$word2, boTrigrams$word3))
+        # Concatenate words to create an n-gram column
+        observedBoTrigrams <- mutate(observedBoTrigrams, ngram = paste(observedBoTrigrams$word1, observedBoTrigrams$word2, observedBoTrigrams$word3))
+        unobservedTrigrams <- boTrigrams[!(boTrigrams$ngram %in% observedBoTrigrams$ngram), ]
         return(unobservedTrigrams)
 }
 
@@ -327,16 +329,20 @@ getBoBigrams <- function(inputString, unobservedTrigramTails) {
         return(boBigrams)
 }
 
-boBigrams <- getBoBigrams(inputText, unobservedTrigramTails)
+boBigrams <- getBoBigrams(inputText, unobservedBoTrigramTails)
 
 # Get OBSERVED bigrams from the set of BO bigrams
 getObservedBoBigrams <- function(inputString, unobservedTrigramTails, inputBigrams) {
         boBigrams <- getBoBigrams(inputString, unobservedTrigramTails)
-        observedBoBigrams <- inputBigrams[inputBigrams$word1 %in% boBigrams$word1 & inputBigrams$word2 %in% boBigrams$word2]
+        # Concatenate words to create an n-gram column
+        boBigrams <- mutate(boBigrams, ngram = paste(boBigrams$word1, boBigrams$word2))
+        # Concatenate words to create an n-gram column
+        inputBigrams <- mutate(inputBigrams, ngram = paste(inputBigrams$word1, inputBigrams$word2))
+        observedBoBigrams <- inputBigrams[inputBigrams$ngram %in% boBigrams$ngram, ]
         return(observedBoBigrams)
 }
 
-observedBoBigrams <- getObservedBoBigrams(inputText, unobservedTrigramTails, bigrams)
+observedBoBigrams <- getObservedBoBigrams(inputText, unobservedBoTrigramTails, bigrams)
 
 # Calculate probabilities for OBSERVED BO bigrams
 # q_bo(w1 | w2)
@@ -368,20 +374,24 @@ alphaBigram <- getAlphaBigram(observedBoBigrams, unigram, gamma2)
 # Get UNOBSERVED bigrams from the set of BO bigrams
 getUnobservedBoBigrams <- function(inputString, unobservedTrigramTails, observedBoBigrams) {
         boBigrams <- getBoBigrams(inputString, unobservedTrigramTails)
-        unobservedBigrams <- boBigrams[!(boBigrams$word1 %in% observedBoBigrams$word1 & boBigrams$word2 %in% observedBoBigrams$word2)]
+        # Concatenate words to create an n-gram column
+        boBigrams <- mutate(boBigrams, ngram = paste(boBigrams$word1, boBigrams$word2))
+        # Concatenate words to create an n-gram column
+        observedBoBigrams <- mutate(observedBoBigrams, ngram = paste(observedBoBigrams$word1, observedBoBigrams$word2))
+        unobservedBigrams <- boBigrams[!(boBigrams$ngram %in% observedBoBigrams$ngram), ]
         return(unobservedBigrams)
 }
 
-unobservedBoBigrams <- getUnobservedBoBigrams(inputText, unobservedTrigramTails, observedBoBigrams)
+unobservedBoBigrams <- getUnobservedBoBigrams(inputText, unobservedBoTrigramTails, observedBoBigrams)
 
 # Calculate probabilities for UNOBSERVED BO bigrams
 # q_bo(w1 | w2)
 getUnobservedBoBigramProbs <- function(unobservedBoBigrams, inputUnigrams, alphaBigram) {
         # get unobserved bigram tails
-        unobservedBoBigrams <- unobservedBoBigrams$word2
-        w_in_Aw_iminus1 <- inputUnigrams[!inputUnigrams$word1 %in% unobservedBoBigrams]
+        unobsBigrams <- unobservedBoBigrams$word2
+        w_in_Aw_iminus1 <- inputUnigrams[!(inputUnigrams$word1 %in% unobsBigrams), ]
         # convert to data table with counts
-        qUnobservedBoBigrams <- inputUnigrams[inputUnigrams$word1 %in% unobservedBoBigrams]
+        qUnobservedBoBigrams <- inputUnigrams[inputUnigrams$word1 %in% unobsBigrams]
         denom <- sum(qUnobservedBoBigrams$count)
         # convert counts to probabilities
         qUnobservedBoBigrams <- data.table(word1 = unobservedBoBigrams$word1, 
