@@ -465,35 +465,25 @@ trigrams <- readRDS(file = "trigrams.rds")
 
 # Combine QUADGRAMS ---------------------------------------------------------------
 
-# Open files
-twitterQuadgrams1 <- readRDS("twitterQuadgrams1.rds")
-twitterQuadgrams2 <- readRDS("twitterQuadgrams2.rds")
-twitterQuadgrams3 <- readRDS("twitterQuadgrams3.rds")
-
-newsQuadgrams <- readRDS("newsQuadgrams.rds")
-
+# Open blogs files
 blogsQuadgrams1 <- readRDS("blogsQuadgrams1.rds")
 blogsQuadgrams2 <- readRDS("blogsQuadgrams2.rds")
 blogsQuadgrams3 <- readRDS("blogsQuadgrams3.rds")
 blogsQuadgrams4 <- readRDS("blogsQuadgrams4.rds")
 blogsQuadgrams5 <- readRDS("blogsQuadgrams5.rds")
 
-# Count quadgrams separately 
-twitterQuadgrams1 <- count(twitterQuadgrams1, ngram, sort = TRUE)
-twitterQuadgrams2 <- count(twitterQuadgrams2, ngram, sort = TRUE)
-twitterQuadgrams3 <- count(twitterQuadgrams3, ngram, sort = TRUE)
-
-newsQuadgrams <- count(newsQuadgrams, ngram, sort = TRUE)
-
+# Count quadgrams separately and combine
 blogsQuadgrams1 <- count(blogsQuadgrams1, ngram, sort = TRUE)
 blogsQuadgrams2 <- count(blogsQuadgrams2, ngram, sort = TRUE)
 blogsQuadgrams3 <- count(blogsQuadgrams3, ngram, sort = TRUE)
 blogsQuadgrams4 <- count(blogsQuadgrams4, ngram, sort = TRUE)
 blogsQuadgrams5 <- count(blogsQuadgrams5, ngram, sort = TRUE)
 
-# Merge quadgrams data tables
-twitterQuadgrams <- merge(twitterQuadgrams1, twitterQuadgrams2, by = "ngram")
-twitterQuadgrams <- merge(twitterQuadgrams, twitterQuadgrams3, by = "ngram")
+# Look at this for merging https://stackoverflow.com/questions/42942405/combine-data-tables-and-sum-the-shared-column
+
+# Try this code to calculate the counts of ngrams
+# sqldf("select count(distinct(x)) from df1")
+# count(distinct(x))
 
 blogsQuadgrams6 <- merge(blogsQuadgrams1, blogsQuadgrams2, by = "ngram")
 blogsQuadgrams6 <- mutate(blogsQuadgrams6, count6 = blogsQuadgrams6$n.x + blogsQuadgrams6$n.y)
@@ -501,12 +491,42 @@ blogsQuadgrams6 <- blogsQuadgrams6[ , !(names(blogsQuadgrams6) %in% c("n.x", "n.
 
 blogsQuadgrams7 <- merge(blogsQuadgrams3, blogsQuadgrams4, by = "ngram")
 blogsQuadgrams7 <- mutate(blogsQuadgrams7, count7 = blogsQuadgrams7$n.x + blogsQuadgrams7$n.y)
-blogsQuadgrams7 <- blogsQuadgrams[7 , !(names(blogsQuadgrams7) %in% c("n.x", "n.y"))]
+blogsQuadgrams7 <- blogsQuadgrams7[ , !(names(blogsQuadgrams7) %in% c("n.x", "n.y"))]
 
 blogsQuadgrams8 <- merge(blogsQuadgrams6, blogsQuadgrams7, by = "ngram")
-blogsQuadgrams9 <- merge(blogsQuadgrams5, blogsQuadrams8, by = "ngram")
-blogsQuadgrams9 <- mutate(blogsQuadgrams9, count = blogsQuadgrams9$)
+blogsQuadgrams9 <- merge(blogsQuadgrams5, blogsQuadgrams8, by = "ngram")
+blogsQuadgrams9 <- mutate(blogsQuadgrams9, count = blogsQuadgrams9$n + blogsQuadgrams9$count6 + blogsQuadgrams9$count7)
+blogsQuadgrams <- blogsQuadgrams9[ , !(names(blogsQuadgrams9) %in% c("n", "count6", "count7"))]
 
+# Save blogs quadgrams and frequencies
+saveRDS(blogsQuadgrams, file = "blogsQuadgrams.rds")
+
+# Remove unnecessary files
+remove(blogsQuadgrams1)
+remove(blogsQuadgrams2)
+remove(blogsQuadgrams3)
+remove(blogsQuadgrams4)
+remove(blogsQuadgrams5)
+remove(blogsQuadgrams6)
+remove(blogsQuadgrams7)
+remove(blogsQuadgrams8)
+remove(blogsQuadgrams9)
+
+gc()
+
+# Open twitter files
+twitterQuadgrams1 <- readRDS("twitterQuadgrams1.rds")
+twitterQuadgrams2 <- readRDS("twitterQuadgrams2.rds")
+twitterQuadgrams3 <- readRDS("twitterQuadgrams3.rds")
+
+# Count twitter quadgrams
+twitterQuadgrams1 <- count(twitterQuadgrams1, ngram, sort = TRUE)
+twitterQuadgrams2 <- count(twitterQuadgrams2, ngram, sort = TRUE)
+twitterQuadgrams3 <- count(twitterQuadgrams3, ngram, sort = TRUE)
+
+# Merge quadgrams data tables
+twitterQuadgrams <- merge(twitterQuadgrams1, twitterQuadgrams2, by = "ngram")
+twitterQuadgrams <- merge(twitterQuadgrams, twitterQuadgrams3, by = "ngram")
 
 # Aggregate count
 twitterQuadgrams <- mutate(twitterQuadgrams, count = twitterQuadgrams$n.x + twitterQuadgrams$n.y + twitterQuadgrams$n)
@@ -514,7 +534,23 @@ twitterQuadgrams <- mutate(twitterQuadgrams, count = twitterQuadgrams$n.x + twit
 # Remove unnecessary columns
 twitterQuadgrams <- twitterQuadgrams[, !(names(twitterQuadgrams) %in% c("n.x", "n.y", "n"))]
 
-# Merge with news data
+# Save twitter quadgrams and frequencies
+saveRDS(twitterQuadgrams, file = "twitterQuadgrams.rds")
+
+# Remove unneessary files
+remove(twitterQuadgrams1)
+remove(twitterQuadgrams2)
+remove(twitterQuadgrams3)
+
+gc()
+
+# Open news quadgrams
+newsQuadgrams <- readRDS("newsQuadgrams.rds")
+
+# Count news quadgrams
+newsQuadgrams <- count(newsQuadgrams, ngram, sort = TRUE)
+
+# Merge twitter and news quadgrams
 quadgrams <- merge(twitterQuadgrams, newsQuadgrams, by = "ngram")
 
 # Aggregate counts
@@ -523,29 +559,28 @@ quadgrams <- mutate(quadgrams, newcount = quadgrams$count + quadgrams$n)
 # Remove unnecessary columns
 quadgrams <- quadgrams[, !(names(quadgrams) %in% c("count", "n"))]
 
+# Close unnecessary files
+remove(twitterQuadgrams)
+remove(newsQuadgrams)
 
+gc()
 
+# Merge with blogs quadgrams
+quadgrams <- merge(quadgrams, blogsQuadgrams, by = "ngram")
 
+# Aggregate counts
+quadgrams <- mutate(quadgrams, totalcount = quadgrams$newcount + quadgrams$count)
 
-quadgrams <- rbindlist(list(twitterQuadgrams, newsQuadgrams), 
-                      use.names = TRUE, fill = FALSE, idcol = NULL)
-
-quadgrams <- rbindlist(list(quadgrams, blogsQuadgrams), 
-                      use.names = TRUE, fill = FALSE, idcol = NULL)
-
-quadgrams <- count(quadgrams, ngram, sort = TRUE)
+# Remove unnecessary columns
+quadgrams <- quadgrams[, !(names(quadgrams) %in% c("newcount", "count"))]
 
 # Delete singletons
 quadgrams <- quadgrams[!(quadgrams$n == 1), ]
 
-remove(twitterQuadgrams)
-remove(newsQuadgrams)
-remove(blogsQuadgrams)
-
 gc()
 
 # Convert to a data table
-quadgrams <- data.table(ngram = quadgrams$ngram, count = quadgrams$n)
+quadgrams <- data.table(ngram = quadgrams$ngram, count = quadgrams$totalcount)
 
 # Separate individual words
 quadgrams <- mutate(quadgrams, word1 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 1))
