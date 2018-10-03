@@ -5,6 +5,8 @@ library(dplyr)
 library(tidytext)
 library(data.table)
 library(quanteda)
+library(sqldf)
+library(hunspell)
 
 # Function to create tokens from a string -----------------------------------------
 makeTokens <- function(input, n = 1L) {
@@ -42,13 +44,13 @@ close(t)
 
 # Clean TWITTER text ---------------------------------------------------------------------------
 
-# Clean training text of special characters and numbers
-
 # Clean text of special characters and numbers
+twitter <- gsub("[[:space:]]*[.?!:;]+[[:space:]]*", '.', twitter) # Replace all terminal puntuation with a fullstop
+twitter <- gsub("[[:space:]]+", " ", twitter) # collapse white space
+twitter <- gsub(" ?\\. +?", ".", twitter) # make sure terminals are tight
 twitter <- gsub("\\.+", " EOS ", twitter) # Replace fullstops with end-of-sentence marker
-twitter <- gsub("\\!+", " EOS ", twitter) # Replace exclamation marks with end-of-sentence marker
-twitter <- gsub("\\?+", " EOS ", twitter) # Replace question marks with end-of-sentence marker
-
+#twitter <- gsub("\\!+", " EOS ", twitter) # Replace exclamation marks with end-of-sentence marker
+#twitter <- gsub("\\?+", " EOS ", twitter) # Replace question marks with end-of-sentence marker
 twitter <- gsub("[0-9]+", "", twitter) # numbers
 twitter <- gsub("\\'", "9", twitter) # make apostrophes "9"
 twitter <- gsub("[[:punct:]]"," ", twitter) # all punctuation
@@ -61,6 +63,9 @@ twitter <- gsub("Ÿ", "", twitter, fixed = TRUE) # special characters
 twitter <- gsub("˜", "", twitter, fixed = TRUE) # special characters
 twitter <- gsub("¡", "", twitter, fixed = TRUE) # special characters
 twitter <- gsub("â", "", twitter, fixed = TRUE) # special characters
+twitter <- gsub(" ?' ?", "'", twitter) # make sure contractions are tight
+
+# Remove words not in dictionary ???
 
 # Store TWITTER data ---------------------------------------------------------------------------
 
@@ -150,10 +155,12 @@ close(n)
 # Clean training text of special characters and numbers
 
 # Clean text of special characters and numbers
+news <- gsub("[[:space:]]*[.?!:;]+[[:space:]]*", '.', news) # Replace all terminal puntuation with a fullstop
+news <- gsub("[[:space:]]+", " ", news) # collapse white space
+news <- gsub(" ?\\. +?", ".", news) # make sure terminals are tight
 news <- gsub("\\.+", " EOS ", news) # Replace fullstops with end-of-sentence marker
 news <- gsub("\\!+", " EOS ", news) # Replace exclamation marks with end-of-sentence marker
 news <- gsub("\\?+", " EOS ", news) # Replace question marks with end-of-sentence marker
-
 news <- gsub("[0-9]+", "", news) # numbers
 news <- gsub("\\'", "9", news) # make apostrophes "9"
 news <- gsub("[[:punct:]]"," ", news) # all punctuation
@@ -166,6 +173,9 @@ news <- gsub("Ÿ", "", news, fixed = TRUE) # special characters
 news <- gsub("˜", "", news, fixed = TRUE) # special characters
 news <- gsub("¡", "", news, fixed = TRUE) # special characters
 news <- gsub("â", "", news, fixed = TRUE) # special characters
+news <- gsub(" ?' ?", "'", news) # make sure contractions are tight
+
+# Remove words not in dictionary ???
 
 # Store NEWS data ---------------------------------------------------------------------------
 
@@ -241,10 +251,12 @@ close(b)
 # Clean training text of special characters and numbers
 
 # Clean text of special characters and numbers
+blogs <- gsub("[[:space:]]*[.?!:;]+[[:space:]]*", '.', blogs) # Replace all terminal puntuation with a fullstop
+blogs <- gsub("[[:space:]]+", " ", blogs) # collapse white space
+blogs <- gsub(" ?\\. +?", ".", blogs) # make sure terminals are tight
 blogs <- gsub("\\.+", " EOS ", blogs) # Replace fullstops with end-of-sentence marker
 blogs <- gsub("\\!+", " EOS ", blogs) # Replace exclamation marks with end-of-sentence marker
 blogs <- gsub("\\?+", " EOS ", blogs) # Replace question marks with end-of-sentence marker
-
 blogs <- gsub("[0-9]+", "", blogs) # numbers
 blogs <- gsub("\\'", "9", blogs) # make apostrophes "9"
 blogs <- gsub("[[:punct:]]"," ", blogs) # all punctuation
@@ -257,6 +269,10 @@ blogs <- gsub("Ÿ", "", blogs, fixed = TRUE) # special characters
 blogs <- gsub("˜", "", blogs, fixed = TRUE) # special characters
 blogs <- gsub("¡", "", blogs, fixed = TRUE) # special characters
 blogs <- gsub("â", "", blogs, fixed = TRUE) # special characters
+blogs <- gsub(" ?' ?", "'", blogs) # make sure contractions are tight
+
+# Remove words not in dictionary ???
+
 
 # Store BLOGS data ---------------------------------------------------------------------------
 
@@ -368,8 +384,14 @@ unigrams <- rbindlist(list(unigrams, blogsUnigrams),
 
 unigrams <- count(unigrams, word, sort = TRUE)
 
+# Also SQLDF
+# sqldf("SELECT word, COUNT(word) FROM unigrams GROUP BY word ORDER BY COUNT(word) DESC")
+ 
 # Delete singletons
 unigrams <- unigrams[!(unigrams$n == 1), ]
+
+# Remove words not in the dictionary
+unigrams <- unigrams[hunspell_check(unigrams$ngram) == TRUE, ]
 
 remove(twitterUnigrams)
 remove(newsUnigrams)
@@ -595,7 +617,7 @@ saveRDS(quadgrams, file = "quadgrams.rds")
 quadgrams <- readRDS(file = "quadgrams.rds")
 
 # Index the ngrams to improve performance
-setkey(unigrams, word1)
+setkey(unigrams, ngram)
 setkey(bigrams, word1, word2)
 setkey(trigrams, word1, word2, word3)
 setkey(quadgrams, word1, word2, word3, word4)
