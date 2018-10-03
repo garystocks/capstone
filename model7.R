@@ -422,6 +422,9 @@ bigrams <- rbindlist(list(twitterBigrams, newsBigrams),
 bigrams <- rbindlist(list(bigrams, blogsBigrams), 
                       use.names = TRUE, fill = FALSE, idcol = NULL)
 
+# Remove bigrams containing a word not in the dictionary
+# bigrams <- bigrams[hunspell(bigrams$ngram)]
+
 bigrams <- count(bigrams, ngram, sort = TRUE)
 
 # Delete singletons
@@ -437,8 +440,8 @@ gc()
 bigrams <- data.table(ngram = bigrams$ngram, count = bigrams$n)
 
 # Separate out the tail (last) word
-bigrams <- mutate(bigrams, word1 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 1))
-bigrams <- mutate(bigrams, word2 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 2))
+# bigrams <- mutate(bigrams, word1 = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 1))
+bigrams <- mutate(bigrams, tail = sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 2))
 
 # Save bigrams to a file
 saveRDS(bigrams, file = "bigrams.rds")
@@ -460,10 +463,16 @@ trigrams <- rbindlist(list(twitterTrigrams, newsTrigrams),
 trigrams <- rbindlist(list(trigrams, blogsTrigrams), 
                      use.names = TRUE, fill = FALSE, idcol = NULL)
 
+# Count trigrams
 trigrams <- count(trigrams, ngram, sort = TRUE)
 
 # Delete singletons
 trigrams <- trigrams[!(trigrams$n == 1), ]
+
+# Remove trigrams with words not in the dictionary
+trigrams <- trigrams[hunspell_check(sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 1)) == TRUE &
+                             hunspell_check(sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 2)) == TRUE &
+                             hunspell_check(sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 3)) == TRUE, ]
 
 remove(twitterTrigrams)
 remove(newsTrigrams)
@@ -471,13 +480,11 @@ remove(blogsTrigrams)
 
 gc()
 
-# Convert to a data table
-trigrams <- data.table(ngram = trigrams$ngram, count = trigrams$n)
+# Separate tail words
+trigrams <- mutate(trigrams, tail = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 3))
 
-# Separate individual words
-trigrams <- mutate(trigrams, word1 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 1))
-trigrams <- mutate(trigrams, word2 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 2))
-trigrams <- mutate(trigrams, word3 = sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 3))
+# Convert to a data table
+trigrams <- data.table(ngram = trigrams$ngram, count = trigrams$n, tail = trigrams$tail)
 
 # Save trigrams to a file
 saveRDS(trigrams, file = "trigrams.rds")
@@ -547,17 +554,22 @@ twitterQuadgrams2 <- count(twitterQuadgrams2, ngram, sort = TRUE)
 twitterQuadgrams3 <- count(twitterQuadgrams3, ngram, sort = TRUE)
 
 # Merge quadgrams data tables
-twitterQuadgrams <- merge(twitterQuadgrams1, twitterQuadgrams2, by = "ngram")
-twitterQuadgrams <- merge(twitterQuadgrams, twitterQuadgrams3, by = "ngram")
+twitterQuadgrams1 <- data.table(twitterQuadgrams1)
+twitterQuadgrams2 <- data.table(twitterQuadgrams2)
+twitterQuadgrams3 <- data.table(twitterQuadgrams3)
+
+setkey(twitterQuadgrams1, ngram)
+setkey(twitterQuadgrams2, ngram)
+setkey(twitterQuadgrams3, ngram)
+
+twitterQuadgrams <- merge(twitterQuadgrams1, twitterQuadgrams2, by = "ngram", all = TRUE)
+twitterQuadgrams <- merge(twitterQuadgrams, twitterQuadgrams3, by = "ngram", all = TRUE)
+
+# Set counts to 0 if NA
+twitterQuadgrams[is.na(twitterQuadgrams)] <- 0
 
 # Aggregate count
 twitterQuadgrams <- mutate(twitterQuadgrams, count = twitterQuadgrams$n.x + twitterQuadgrams$n.y + twitterQuadgrams$n)
-
-# Remove unnecessary columns
-twitterQuadgrams <- twitterQuadgrams[, !(names(twitterQuadgrams) %in% c("n.x", "n.y", "n"))]
-
-# Save twitter quadgrams and frequencies
-saveRDS(twitterQuadgrams, file = "twitterQuadgrams.rds")
 
 # Remove unneessary files
 remove(twitterQuadgrams1)
@@ -566,6 +578,12 @@ remove(twitterQuadgrams3)
 
 gc()
 
+# Remove unnecessary columns
+twitterQuadgrams <- twitterQuadgrams[, !(names(twitterQuadgrams) %in% c("n.x", "n.y", "n"))]
+
+# Save twitter quadgrams and frequencies
+saveRDS(twitterQuadgrams, file = "twitterQuadgrams.rds")
+
 # Open news quadgrams
 newsQuadgrams <- readRDS("newsQuadgrams.rds")
 
@@ -573,7 +591,16 @@ newsQuadgrams <- readRDS("newsQuadgrams.rds")
 newsQuadgrams <- count(newsQuadgrams, ngram, sort = TRUE)
 
 # Merge twitter and news quadgrams
-quadgrams <- merge(twitterQuadgrams, newsQuadgrams, by = "ngram")
+newsQuadgrams <- data.table(newsQuadgrams)
+setkey(newsQuadgrams, ngram)
+
+twitterQuadgrams <- data.table(twitterQuadgrams)
+setkey(twitterQuadgrams, ngram)
+
+quadgrams <- merge(twitterQuadgrams, newsQuadgrams, by = "ngram", all = TRUE)
+
+# Set counts to 0 if NA
+quadgrams[is.na(quadgrams)] <- 0
 
 # Aggregate counts
 quadgrams <- mutate(quadgrams, newcount = quadgrams$count + quadgrams$n)
@@ -618,7 +645,7 @@ quadgrams <- readRDS(file = "quadgrams.rds")
 
 # Index the ngrams to improve performance
 setkey(unigrams, ngram)
-setkey(bigrams, word1, word2)
+setkey(bigrams, ngram)
 setkey(trigrams, word1, word2, word3)
 setkey(quadgrams, word1, word2, word3, word4)
 
