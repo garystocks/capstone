@@ -514,17 +514,70 @@ blogsQuadgrams5 <- count(blogsQuadgrams5, ngram, sort = TRUE)
 # sqldf("select count(distinct(x)) from df1")
 # count(distinct(x))
 
-blogsQuadgrams6 <- merge(blogsQuadgrams1, blogsQuadgrams2, by = "ngram")
+# Combine 1 and 2
+blogsQuadgrams6 <- merge(blogsQuadgrams1, blogsQuadgrams2, by = "ngram", all = TRUE)
+
+# Set NA counts to 0 
+blogsQuadgrams6[is.na(blogsQuadgrams6)] <- 0 
+
+# Sum counts
 blogsQuadgrams6 <- mutate(blogsQuadgrams6, count6 = blogsQuadgrams6$n.x + blogsQuadgrams6$n.y)
+
+# Delete unnecessary columns
 blogsQuadgrams6 <- blogsQuadgrams6[ , !(names(blogsQuadgrams6) %in% c("n.x", "n.y"))]
 
-blogsQuadgrams7 <- merge(blogsQuadgrams3, blogsQuadgrams4, by = "ngram")
+# Remove unnecessary tables
+remove(blogsQuadgrams1)
+remove(blogsQuadgrams2)
+
+gc()
+
+# Merge 3 and 4
+blogsQuadgrams7 <- merge(blogsQuadgrams3, blogsQuadgrams4, by = "ngram", all = TRUE)
+
+# Set NA counts to 0
+blogsQuadgrams7[is.na(blogsQuadgrams7)] <- 0 
+
+# Sum counts
 blogsQuadgrams7 <- mutate(blogsQuadgrams7, count7 = blogsQuadgrams7$n.x + blogsQuadgrams7$n.y)
+
+# Remove unnecessary columns
 blogsQuadgrams7 <- blogsQuadgrams7[ , !(names(blogsQuadgrams7) %in% c("n.x", "n.y"))]
 
-blogsQuadgrams8 <- merge(blogsQuadgrams6, blogsQuadgrams7, by = "ngram")
-blogsQuadgrams9 <- merge(blogsQuadgrams5, blogsQuadgrams8, by = "ngram")
+# Remove unnecessary tables
+remove(blogsQuadgrams3)
+remove(blogsQuadgrams4)
+
+gc()
+
+# Merge 6 and 7
+blogsQuadgrams8 <- merge(blogsQuadgrams6, blogsQuadgrams7, by = "ngram", all = TRUE)
+
+# Set NA counts to 0
+blogsQuadgrams8[is.na(blogsQuadgrams8)] <- 0 
+
+# Remove unnecessary tables
+remove(blogsQuadgrams6)
+remove(blogsQuadgrams7)
+
+gc()
+
+# Delete singletons to reduce size
+blogsQuadgrams5 <- blogsQuadgrams5[!(blogsQuadgrams5$n == 1), ]
+blogsQuadgrams8 <- blogsQuadgrams8[!(blogsQuadgrams8$count6 == 1 | blogsQuadgrams8$count7 == 1), ]
+
+gc()
+
+# Merge 5 and 8
+blogsQuadgrams9 <- merge(blogsQuadgrams5, blogsQuadgrams8, by = "ngram", all = TRUE)
+
+# Set NA counts to 0
+blogsQuadgrams9[is.na(blogsQuadgrams9)] <- 0 
+
+# Sum counts
 blogsQuadgrams9 <- mutate(blogsQuadgrams9, count = blogsQuadgrams9$n + blogsQuadgrams9$count6 + blogsQuadgrams9$count7)
+
+# Delete unnecessary columns
 blogsQuadgrams <- blogsQuadgrams9[ , !(names(blogsQuadgrams9) %in% c("n", "count6", "count7"))]
 
 # Save blogs quadgrams and frequencies
@@ -615,7 +668,10 @@ remove(newsQuadgrams)
 gc()
 
 # Merge with blogs quadgrams
-quadgrams <- merge(quadgrams, blogsQuadgrams, by = "ngram")
+quadgrams <- merge(quadgrams, blogsQuadgrams, by = "ngram", all = TRUE)
+
+# Set NA counts to 0
+quadgrams[is.na(quadgrams)] <- 0
 
 # Aggregate counts
 quadgrams <- mutate(quadgrams, totalcount = quadgrams$newcount + quadgrams$count)
@@ -624,18 +680,15 @@ quadgrams <- mutate(quadgrams, totalcount = quadgrams$newcount + quadgrams$count
 quadgrams <- quadgrams[, !(names(quadgrams) %in% c("newcount", "count"))]
 
 # Delete singletons
-quadgrams <- quadgrams[!(quadgrams$n == 1), ]
+quadgrams <- quadgrams[!(quadgrams$totalcount == 1), ]
 
 gc()
 
 # Convert to a data table
 quadgrams <- data.table(ngram = quadgrams$ngram, count = quadgrams$totalcount)
 
-# Separate individual words
-quadgrams <- mutate(quadgrams, word1 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 1))
-quadgrams <- mutate(quadgrams, word2 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 2))
-quadgrams <- mutate(quadgrams, word3 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 3))
-quadgrams <- mutate(quadgrams, word4 = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 4))
+# Separate tail words
+quadgrams <- mutate(quadgrams, tail = sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 4))
 
 # Save quadgrams to a file
 saveRDS(quadgrams, file = "quadgrams.rds")
@@ -646,8 +699,8 @@ quadgrams <- readRDS(file = "quadgrams.rds")
 # Index the ngrams to improve performance
 setkey(unigrams, ngram)
 setkey(bigrams, ngram)
-setkey(trigrams, word1, word2, word3)
-setkey(quadgrams, word1, word2, word3, word4)
+setkey(trigrams, ngram)
+setkey(quadgrams, ngram)
 
 
 # BACK OFF MODEL ----------------------------------------------------------------------
