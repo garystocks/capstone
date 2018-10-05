@@ -702,6 +702,37 @@ setkey(bigrams, ngram)
 setkey(trigrams, ngram)
 setkey(quadgrams, ngram)
 
+# DATA SETUP --------------------------------------------------------------------------
+
+# Open data files and index
+unigrams <- readRDS("unigrams.rds")
+unigrams <- data.table(unigrams)
+setkey(unigrams, ngram)
+
+bigrams <- readRDS("bigrams.rds")
+bigrams <- data.table(bigrams)
+setkey(bigrams, ngram)
+
+trigrams <- readRDS("trigrams.rds")
+trigrams <- data.table(trigrams)
+setkey(trigrams, ngram)
+
+quadgrams <- readRDS("quadgrams.rds")
+quadgrams <- data.table(quadgrams)
+setkey(quadgrams, ngram)
+
+# Reduce table sizes by removing rows with word(s) not in the dictionary
+unigrams <- unigrams[hunspell_check(unigrams$ngram), ]
+bigrams <- bigrams[hunspell_check(sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 1)) &
+                   hunspell_check(sapply(strsplit(bigrams$ngram, " ", fixed = TRUE), '[[', 2)), ]
+trigrams <- trigrams[hunspell_check(sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 1)) &
+                     hunspell_check(sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 2)) &
+                     hunspell_check(sapply(strsplit(trigrams$ngram, " ", fixed = TRUE), '[[', 3)), ]
+quadgrams <- quadgrams[hunspell_check(sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 1)) &
+                             hunspell_check(sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 2)) &
+                             hunspell_check(sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 3)) &
+                             hunspell_check(sapply(strsplit(quadgrams$ngram, " ", fixed = TRUE), '[[', 4))  , ]
+
 
 # BACK OFF MODEL ----------------------------------------------------------------------
 
@@ -726,18 +757,12 @@ inputText <- "a case of"
 
 # Find OBSERVED quadgrams and the counts
 getObservedQuadgrams <- function(inputString, inputQuadgrams) {
-        quadgramsFound <- data.table(word1 = vector(mode = "character", length = 0),
-                                     word2 = vector(mode = "character", length = 0),
-                                     word3 = vector(mode = "character", length = 0),
-                                     word4 = vector(mode = "character", length = 0),
-                                     count = vector(mode = "integer", length = 0))
-        words <- makeTokens(inputString, n = 1L)
-        quadgramIndices <- inputQuadgrams[inputQuadgrams$word1 == words$text1[1] & 
-                                                  inputQuadgrams$word2 == words$text1[2] & 
-                                                  inputQuadgrams$word3 == words$text1[3], ]
-        if(length(quadgramIndices) > 0 ) {
-                quadgramsFound <- quadgramIndices
-        }
+        quadgramsFound <- data.table(ngram = vector(mode = "character", length = 0),
+                                     count = vector(mode = "integer", length = 0),
+                                     tail = vector(mode = "character", length = 0))
+        quadgramsFound <- sqldf(sprintf("SELECT * FROM quadgrams WHERE ngram LIKE '%s%s'",
+                                        inputText, "%"))
+
         return(quadgramsFound)
 }
 
