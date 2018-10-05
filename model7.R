@@ -771,9 +771,8 @@ observedQuadgrams <- getObservedQuadgrams(inputText, quadgrams)
 # Calculate the probabilities of observed quadgrams beginning with inputText
 getObservedQuadgramProbs <- function(observedQuadgrams, inputTrigrams, inputString, quadgramDisc = .5) {
         if(nrow(observedQuadgrams) < 1) return(NULL)
-        obsCount <- filter(inputTrigrams, word1 == makeTokens(inputString)$text1[1] & word2 == makeTokens(inputString)$text1[2] & word3 == makeTokens(inputString)$text1[3])$count[1]
-        obsQuadgramProbs <- mutate(observedQuadgrams, count = ((count - quadgramDisc) / obsCount))
-        colnames(obsQuadgramProbs) <- c("word1", "word2", "word3", "word4", "prob")
+        obsCount <- sqldf(sprintf("SELECT count FROM inputTrigrams WHERE ngram = '%s'", inputString))$count
+        obsQuadgramProbs <- mutate(observedQuadgrams, prob = ((count - quadgramDisc) / obsCount))
         
         return(obsQuadgramProbs)
 }
@@ -788,15 +787,13 @@ getAlphaQuadgram <- function(observedQuadgrams, trigram, quadgramDisc = .5) {
         return(alphaQuadgram)
 }
 
-trigram <- trigrams[trigrams$word1 == makeTokens(inputText, n = 1L)$text1[1] &
-                            trigrams$word2 == makeTokens(inputText, n = 1L)$text1[2] &
-                            trigrams$word3 == makeTokens(inputText, n = 1L)$text1[3], ]
+trigram <- sqldf(sprintf("SELECT * FROM trigrams WHERE ngram = '%s'", inputText))
 alphaQuadgram <- getAlphaQuadgram(observedQuadgrams, trigram, gamma4)
 
 # Find the tail (last) words of UNOBSERVED quadgrams that start with the first 3 words of observedQuadgrams
 getUnobservedQuadgramTails <- function(observedQuadgrams, inputUnigrams) {
-        observedQuadgramTails <- observedQuadgrams$word4
-        unobservedQuadgramTails <- inputUnigrams[!(inputUnigrams$word1 %in% observedQuadgramTails), ]$word1
+        observedQuadgramTails <- observedQuadgrams$tail
+        unobservedQuadgramTails <- inputUnigrams[!(inputUnigrams$ngram %in% observedQuadgramTails)]$ngram
         return(unobservedQuadgramTails)
 }
 
@@ -804,37 +801,32 @@ unobservedQuadgramTails <- getUnobservedQuadgramTails(observedQuadgrams, unigram
 
 # Get backed off trigrams
 getBoTrigrams <- function(inputString, unobservedQuadgramTails) {
-        w_i_minus2 <- makeTokens(inputString, n = 1L)$text1[[2]]
-        w_i_minus1 <- makeTokens(inputString, n = 1L)$text1[[3]]
-        boTrigrams <- data.table(word1 = rep(w_i_minus2, length(unobservedQuadgramTails)), 
-                                 word2 = rep(w_i_minus1, length(unobservedQuadgramTails)), 
-                                 word3 = unobservedQuadgramTails)
+        w_i_minus2 <- strsplit(inputString, " ")[[1]][2] 
+        w_i_minus1 <- strsplit(inputString, " ")[[1]][3]
+        boTrigrams <- paste(w_i_minus2, w_i_minus1, unobservedQuadgramTails, sep = " ")
+        
         return(boTrigrams)
 }
 
 boTrigrams <- getBoTrigrams(inputText, unobservedQuadgramTails)
 
 # Find OBSERVED trigrams from BO trigrams
-getObservedBoTrigrams <- function(inputString, unobservedQuadgramTails, inputTrigrams) {
-        boTrigrams <- getBoTrigrams(inputString, unobservedQuadgramTails)
-        # Concatenate words to create an n-gram column
-        boTrigrams <- mutate(boTrigrams, ngram = paste(boTrigrams$word1, boTrigrams$word2, boTrigrams$word3))
-        # Concatenate words to create an n-gram column
-        inputTrigrams <- mutate(inputTrigrams, ngram = paste(inputTrigrams$word1, inputTrigrams$word2, inputTrigrams$word3))
-        observedBoTrigrams <- inputTrigrams[inputTrigrams$ngram %in% boTrigrams$ngram, ]
-        observedBoTrigrams <- observedBoTrigrams[, !(names(observedBoTrigrams) %in% "ngram")]
+getObservedBoTrigrams <- function(boTrigrams, inputString, unobservedQuadgramTails, inputTrigrams) {
+        observedBoTrigrams <- inputTrigrams[inputTrigrams$ngram %in% boTrigrams, ]
+        
         return(observedBoTrigrams)
 }
 
-observedBoTrigrams <- getObservedBoTrigrams(inputText, unobservedQuadgramTails, trigrams)
+observedBoTrigrams <- getObservedBoTrigrams(boTrigrams, inputText, unobservedQuadgramTails, trigrams)
 
 # Calculate the probabilities of observed BO trigrams
 getObservedBoTrigramProbs <- function(observedBoTrigrams, inputBigrams, inputString, trigramDisc = .5) {
         if(nrow(observedBoTrigrams) < 1) return(NULL)
-        obsCount <- filter(inputBigrams, inputBigrams$word1 == makeTokens(inputString)$text1[2] & 
-                                   inputBigrams$word2 == makeTokens(inputString)$text1[3])$count[1]
-        obsTrigramProbs <- mutate(observedBoTrigrams, count = ((count - trigramDisc) / obsCount))
-        colnames(obsTrigramProbs) <- c("word1", "word2", "word3", "prob")
+        w_i_minus2 <- strsplit(inputString, " ")[[1]][2] 
+        w_i_minus1 <- strsplit(inputString, " ")[[1]][3]
+        bigram <- paste(w_i_minus2, w_i_minus1, sep = " ")
+        obsCount <- sqldf(sprintf("SELECT count FROM inputBigrams WHERE ngram = '%s'", bigram))$count
+        obsTrigramProbs <- mutate(observedBoTrigrams, prob = ((count - trigramDisc) / obsCount))
         
         return(obsTrigramProbs)
 }
@@ -843,14 +835,14 @@ qObservedBoTrigrams <- getObservedBoTrigramProbs(observedBoTrigrams, bigrams, in
 
 # Calculate the discount mass probability to redistribute to bigrams
 getAlphaTrigram <- function(observedBoTrigrams, bigram, trigramDisc = .5) {
-        if(nrow(observedBoTrigrams) < 1) return(0)
+        if(nrow(observedBoTrigrams) < 1) return(1)
         alpha <- 1 - sum((observedBoTrigrams$count - trigramDisc) / bigram$count[1])
         
         return(alpha)
 }
 
-bigram <- bigrams[bigrams$word1 == makeTokens(inputText, n = 1L)$text1[2] &
-                          bigrams$word2 == makeTokens(inputText, n = 1L)$text1[3], ]
+bigram <- sqldf(sprintf("SELECT * FROM bigrams WHERE ngram = '%s%s%s'", 
+                        strsplit(inputText, " ")[[1]][2], " ", strsplit(inputText, " ")[[1]][3]))
 alphaTrigram <- getAlphaTrigram(observedBoTrigrams, bigram, gamma3)
 
 # Find UNOBSERVED trigrams from BO trigrams
