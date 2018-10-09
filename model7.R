@@ -748,20 +748,24 @@ quadgrams <- quadgrams[hunspell_check(sapply(strsplit(quadgrams$ngram, " ", fixe
 "Be grateful for the good times and keep the faith during the" # WORSE
 "If this isn't the cutest thing you've ever seen, then you must be" # INSANE
 
+# Quiz 3
+"When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
+"Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
+
 # Set discounts
 gamma2 <- .5 # bigram discount
 gamma3 <- .5 # trigram discount
 gamma4 <- .5 # quadgram discount
 
-inputText <- "a case of"
+inputText <- "you must be"
 
 # Find OBSERVED quadgrams and the counts
 getObservedQuadgrams <- function(inputString, inputQuadgrams) {
         quadgramsFound <- data.table(ngram = vector(mode = "character", length = 0),
                                      count = vector(mode = "integer", length = 0),
                                      tail = vector(mode = "character", length = 0))
-        quadgramsFound <- sqldf(sprintf("SELECT * FROM quadgrams WHERE ngram LIKE '%s%s'",
-                                        inputText, "%"))
+        quadgramsFound <- sqldf(sprintf("SELECT * FROM inputQuadgrams WHERE ngram LIKE '%s%s'",
+                                        inputString, "%"))
 
         return(quadgramsFound)
 }
@@ -856,18 +860,21 @@ getUnobservedBoTrigrams <- function(boTrigrams, inputString, observedBoTrigrams)
 }
 
 # Find the tail words of UNOBSERVED trigrams that start with the first 2 words of observedTrigrams
-getUnobservedBoTrigramTails <- function(observedBoTrigrams, inputUnigrams) {
+getUnobservedBoTrigramTails <- function(observedBoTrigrams, unobservedQuadgramTails) {
         observedTrigramTails <- observedBoTrigrams$tail
-        unobservedTrigramTails <- inputUnigrams[!(inputUnigrams$ngram %in% observedTrigramTails), ]$ngram
+        unobservedQuadgramTails <- data.table(unobservedQuadgramTails)
+        names(unobservedQuadgramTails) <- "tail"
+        unobservedTrigramTails <- unobservedQuadgramTails[!(unobservedQuadgramTails$tail %in% observedTrigramTails), ]
+       
         return(unobservedTrigramTails)
 }
 
-unobservedBoTrigramTails <- getUnobservedBoTrigramTails(observedBoTrigrams, unigrams)
+unobservedBoTrigramTails <- getUnobservedBoTrigramTails(observedBoTrigrams, unobservedQuadgramTails)
 
 # Get backed off bigrams
 getBoBigrams <- function(inputString, unobservedTrigramTails) {
         w_i_minus1 <- strsplit(inputString, " ")[[1]][3]
-        boBigrams <- paste(w_i_minus1, unobservedTrigramTails, sep = " ")
+        boBigrams <- paste(w_i_minus1, unobservedTrigramTails$tail, sep = " ")
         
         return(boBigrams)
 }
@@ -875,7 +882,7 @@ getBoBigrams <- function(inputString, unobservedTrigramTails) {
 boBigrams <- getBoBigrams(inputText, unobservedBoTrigramTails)
 
 # Get OBSERVED bigrams from the set of BO bigrams
-getObservedBoBigrams <- function(boBigrams, inputString, unobservedTrigramTails, inputBigrams) {
+getObservedBoBigrams <- function(boBigrams, inputBigrams) {
         # Put BO bigrams in a data table
         boBigrams <- data.table(boBigrams)
         names(boBigrams) <- "ngram"
@@ -884,11 +891,12 @@ getObservedBoBigrams <- function(boBigrams, inputString, unobservedTrigramTails,
         return(observedBoBigrams)
 }
 
-observedBoBigrams <- getObservedBoBigrams(boBigrams, inputText, unobservedBoTrigramTails, bigrams)
+observedBoBigrams <- getObservedBoBigrams(boBigrams, bigrams)
 
 # Calculate probabilities for OBSERVED BO bigrams
 # q_bo(w1 | w2)
 getObservedBoBigramProbs <- function(observedBoBigrams, inputUnigrams, bigramDisc = .5) {
+        if(nrow(observedBoBigrams) < 1) return(NULL)
         # Get the first word of the bigram
         word <- strsplit(observedBoBigrams$ngram, " ")[[1]][1]
         # word <- observedBoBigrams$word1[1]
@@ -915,7 +923,7 @@ unigram <- unigrams[unigrams$ngram == strsplit(inputText, " ")[[1]][3]]
 alphaBigram <- getAlphaBigram(observedBoBigrams, unigram, gamma2)
 
 # Get UNOBSERVED bigrams from the set of BO bigrams
-getUnobservedBoBigrams <- function(boBigrams, inputString, unobservedTrigramTails, observedBoBigrams) {
+getUnobservedBoBigrams <- function(boBigrams, observedBoBigrams) {
         # Put BO bigrams in a data table
         boBigrams <- data.table(boBigrams)
         names(boBigrams) <- "ngram"
@@ -925,7 +933,7 @@ getUnobservedBoBigrams <- function(boBigrams, inputString, unobservedTrigramTail
         return(unobservedBigrams)
 }
 
-unobservedBoBigrams <- getUnobservedBoBigrams(boBigrams, inputText, unobservedBoTrigramTails, observedBoBigrams)
+unobservedBoBigrams <- getUnobservedBoBigrams(boBigrams, observedBoBigrams)
 
 # Calculate probabilities for UNOBSERVED BO bigrams
 # q_bo(w1 | w2)
