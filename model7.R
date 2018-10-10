@@ -740,24 +740,33 @@ quadgrams <- quadgrams[hunspell_check(sapply(strsplit(quadgrams$ngram, " ", fixe
 "The guy in front of me just bought a pound of bacon, a bouquet, and a case of" # BEER
 "You're the reason why I smile everyday. Can you follow me please? It would mean the" # WORLD
 "Hey sunshine, can you follow me and make me the" # HAPPIEST
-"Very early observations on the Bills game: Offense still struggling but the" 
+"Very early observations on the Bills game: Offense still struggling but the" # DEFENSE
 "Go on a romantic date at the" # BEACH
 "Well I'm pretty sure my granny has some old bagpipes in her garage I'll dust them off and be on my" # WAY
 "Ohhhhh #PointBreak is on tomorrow. Love that film and haven't seen it in quite some" # TIME
 "After the ice bucket challenge Louis will push his long wet hair out of his eyes with his little" # FINGERS
-"Be grateful for the good times and keep the faith during the" # WORSE
+"Be grateful for the good times and keep the faith during the" # BAD
 "If this isn't the cutest thing you've ever seen, then you must be" # INSANE
 
 # Quiz 3
-"When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd"
-"Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his"
+"When you breathe, I want to be the air for you. I'll be there for you, I'd live and I'd" # die (not give)
+"Guy at my table's wife got up to go to the bathroom and I asked about dessert and he started telling me about his" # marital
+"I'd give anything to see arctic monkeys this" # weekend (not morning)
+"Talking to your mom has the same effect as a hug and helps reduce your" # stress
+"When you were in Holland you were like 1 inch away from me but you hadn't time to take a" # picture
+"I'd just like all of these questions answered, a presentation of evidence, and a jury to settle the" # matter
+"I can't deal with unsymetrical things. I can't even hold an uneven number of bags of groceries in each" # hand
+"Every inch of you is perfect from the bottom to the" # top
+"I’m thankful my childhood was filled with imagination and bruises from playing" # outside
+"I like how the same people are in almost all of Adam Sandler's" # movies
+
 
 # Set discounts
 gamma2 <- .5 # bigram discount
-gamma3 <- .5 # trigram discount
-gamma4 <- .5 # quadgram discount
+gamma3 <- .7 # trigram discount
+gamma4 <- .8 # quadgram discount
 
-inputText <- "you must be"
+inputText <- "live and id"
 
 # Find OBSERVED quadgrams and the counts
 getObservedQuadgrams <- function(inputString, inputQuadgrams) {
