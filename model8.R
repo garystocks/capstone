@@ -47,7 +47,7 @@ sampleFile <- function(infile, outfile, header = TRUE) {
                         return(numout)
                 }
                 recnum <- recnum + 1
-                if (rbinom(1, 1, prob = .7) == 1) {
+                if (rbinom(1, 1, prob = .1) == 1) {
                         numout <- numout + 1
                         writeLines(inrec, co)
                 }
@@ -113,7 +113,7 @@ cleanText <- function(txt) {
         
         # Replace :.?! with end of sentence tags <eos>
         # and eliminate other punctuation except apostrophes
-        txt<- gsub("[:.?!]+", " <eos> ", gsub("(?![:.?!'])[[:punct:]]", " ", txt, perl=T))
+        txt<- gsub("[:.?!]+", " EOS ", gsub("(?![:.?!'])[[:punct:]]", " ", txt, perl=T))
         
         # Remove errant apostrohes
         txt<-gsub(" ' "," ", txt)        
@@ -121,7 +121,7 @@ cleanText <- function(txt) {
         txt<-gsub("^'", "", txt)
         
         # Replaces number with number tag <num>
-        txt<- gsub("[0-9]+"," <num> ", txt)
+        txt<- gsub("[0-9]+"," NUM ", txt)
         
         # Removes website Url
         txt <-gsub(" www(.+) ", " ", txt)
@@ -134,9 +134,59 @@ cleanText <- function(txt) {
         return(txt)
 }
 
-# Clean twitter sample
+# Clean samples
 twitterClean <- cleanText(twitter)
 newsClean <- cleanText(news)
 blogsClean <- cleanText(blogs)
+
+# Save files
+saveRDS(twitterClean, file = "./data/twitter.txt")
+saveRDS(newsClean, file = "./data/news.txt")
+saveRDS(blogsClean, file = "./data/blogs.txt")
+
+# Create corpus --------------------------------------------------------------------------
+
+# Combine text vectors
+textClean <- c(twitterClean, newsClean, blogsClean)
+
+# Create corpus
+myCorpus <- quanteda::corpus(textClean)
+
+# Create n-grams -------------------------------------------------------------------------
+
+# Tokenise the corpus
+myTokens <- tokens(myCorpus, what = "word")
+
+# Extract unigrams, create a document feature matrix, save in a data table
+unigrams <- tokens_ngrams(myTokens, n = 1L)
+dfmUnigrams <- dfm(unigrams)
+unigramsDT <- data.table(ngram = featnames(dfmUnigrams), count = colSums(dfmUnigrams), 
+                         stringsAsFactors = FALSE)
+
+# Extract bigrams, create a document feature matrix, save in a data table and extract tail word
+bigrams <- tokens_ngrams(myTokens, n = 2L, concatenator = "_")
+dfmBigrams <- dfm(bigrams)
+bigramsDT <- data.table(ngram = featnames(dfmBigrams), count = colSums(dfmBigrams),
+                        stringsAsFactors = FALSE)
+tailWords <- sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 2)
+bigramsDT <- bigramsDT[, tail := tailWords]
+
+# Extract trigrams, create a document feature matrix, save in a data table and extract tail word
+trigrams <- tokens_ngrams(myTokens, n = 3L, concatenator = "_")
+dfmTrigrams <- dfm(trigrams)
+trigramsDT <- data.table(ngram = featnames(dfmTrigrams), count = colSums(dfmTrigrams),
+                        stringsAsFactors = FALSE)
+tailWords <- sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 3)
+trigramsDT <- trigramsDT[, tail := tailWords]
+
+# Extract quadgrams, create a document feature matrix, save in a data table and extract tail word
+quadgrams <- tokens_ngrams(myTokens, n = 4L, concatenator = "_")
+dfmQuadgrams <- dfm(quadgrams)
+quadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQuadgrams),
+                         stringsAsFactors = FALSE)
+tailWords <- sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
+quadgramsDT <- quadgramsDT[, tail := tailWords]
+
+# Remove low frequency ngrams -----------------------------------------------------------
 
 
