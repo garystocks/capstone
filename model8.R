@@ -8,6 +8,7 @@ library(quanteda)
 library(sqldf)
 library(hunspell)
 library(tm)
+library(readr)
 
 # Get a list of profanities to remove --------------------------------------------------------
 
@@ -61,25 +62,31 @@ sampleFile <- function(infile, outfile, header = TRUE) {
 t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
 sampleFile(t, "twitter.txt", header = FALSE)
 
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt", "r")
-twitter <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
-close(con) 
+twitter <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
+
+#con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt", "r")
+#twitter <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
+#close(con) 
 
 # Extract news sample
 n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
 sampleFile(n, "news.txt", header = FALSE)
 
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
-news <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
-close(con)
+news <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
+
+#con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
+#news <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
+#close(con)
 
 # Extract blogs sample
 b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
 sampleFile(b, "blogs.txt", header = FALSE)
 
-con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt", "r")
-blogs <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
-close(con)
+blogs <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
+
+#con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt", "r")
+#blogs <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
+#close(con)
 
 
 # Clean text ---------------------------------------------------------------------------
@@ -263,5 +270,9 @@ remove(sixgramsDT)
 # Combine into a single data table ------------------------------------------------------
 
 # Remove tail word from ngram column
+# Columns: ngram (containing n-1 words), tail (containing word n), count
+
+# Index on ngram column
+
 
 
