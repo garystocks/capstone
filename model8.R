@@ -28,6 +28,9 @@ saveRDS(profanity, file = "profanity.rds")
 
 # Extract samples -----------------------------------------------------------------------
 
+## NEED TO UPDATE THE SAMPLE CODE TO EXTRACT A TEST SET AT THE SAME TIME !!!
+## 70% for training, 10% for HOLD OUT (for lambdas if using interpolation), 20% testing
+
 # Define a function to extract a random sample of 10% of each file and store in a file
 sampleFile <- function(infile, outfile, header = TRUE) {
         set.seed(12345)
@@ -146,13 +149,33 @@ saveRDS(blogsClean, file = "./data/blogs.txt")
 
 # Create corpus --------------------------------------------------------------------------
 
+# Build 3 corpii and reshape to sentences
+twitterCorpus <- quanteda::corpus(twitterClean)
+twitterCorpus <- corpus_reshape(twitterCorpus, to = "sentences")
+remove(twitterClean)
+
+newsCorpus <- quanteda::corpus(newsClean)
+newsCorpus <- corpus_reshape(newsCorpus, to = "sentences")
+remove(newsClean)
+
+blogsCorpus <- quanteda::corpus(blogsClean)
+blogsCorpus <- corpus_reshape(blogsCorpus, to = "sentences")
+remove(blogsClean)
+
 # Combine text vectors
-textClean <- c(twitterClean, newsClean, blogsClean)
+corpusList <- c(twitterCorpus, newsCorpus, blogsCorpus)
 
 # Create corpus
-myCorpus <- quanteda::corpus(textClean)
+myCorpus <- quanteda::corpus(corpusList)
+remove(twitterCorpus)
+remove(newsCorpus)
+remove(blogsCorpus)
+
 
 # Create n-grams -------------------------------------------------------------------------
+
+## CREATE 5-grams as well !!!!
+## Put all n-grams into a single data.table??
 
 # Tokenise the corpus
 myTokens <- tokens(myCorpus, what = "word")
@@ -163,6 +186,11 @@ dfmUnigrams <- dfm(unigrams)
 unigramsDT <- data.table(ngram = featnames(dfmUnigrams), count = colSums(dfmUnigrams), 
                          stringsAsFactors = FALSE)
 
+saveRDS(unigramsDT, file = "./data/unigramsDT.rds")
+remove(unigrams)
+remove(dfmUnigrams)
+remove(unigramsDT)
+
 # Extract bigrams, create a document feature matrix, save in a data table and extract tail word
 bigrams <- tokens_ngrams(myTokens, n = 2L, concatenator = "_")
 dfmBigrams <- dfm(bigrams)
@@ -170,6 +198,11 @@ bigramsDT <- data.table(ngram = featnames(dfmBigrams), count = colSums(dfmBigram
                         stringsAsFactors = FALSE)
 tailWords <- sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 2)
 bigramsDT <- bigramsDT[, tail := tailWords]
+
+saveRDS(bigramsDT, file = "./data/bigramsDT.rds")
+remove(bigrams)
+remove(dfmBigrams)
+remove(bigramsDT)
 
 # Extract trigrams, create a document feature matrix, save in a data table and extract tail word
 trigrams <- tokens_ngrams(myTokens, n = 3L, concatenator = "_")
@@ -179,6 +212,11 @@ trigramsDT <- data.table(ngram = featnames(dfmTrigrams), count = colSums(dfmTrig
 tailWords <- sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 3)
 trigramsDT <- trigramsDT[, tail := tailWords]
 
+saveRDS(trigramsDT, file = "./data/trigramsDT.rds")
+remove(trigrams)
+remove(dfmTrigrams)
+remove(trigramsDT)
+
 # Extract quadgrams, create a document feature matrix, save in a data table and extract tail word
 quadgrams <- tokens_ngrams(myTokens, n = 4L, concatenator = "_")
 dfmQuadgrams <- dfm(quadgrams)
@@ -187,6 +225,43 @@ quadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQu
 tailWords <- sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
 quadgramsDT <- quadgramsDT[, tail := tailWords]
 
+saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
+remove(quadgrams)
+remove(dfmQuadgrams)
+remove(quadgramsDT)
+
+# Extract 5-grams, create a document feature matrix, save in a data table and extract tail word
+fivegrams <- tokens_ngrams(myTokens, n = 5L, concatenator = "_")
+dfmFivegrams <- dfm(fivegrams)
+fivegramsDT <- data.table(ngram = featnames(dfmFivegrams), count = colSums(dfmFivegrams),
+                          stringsAsFactors = FALSE)
+tailWords <- sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4)
+fivegramsDT <- fivegramsDT[, tail := tailWords]
+
+saveRDS(fivegramsDT, file = "./data/fivegramsDT.rds")
+remove(fivegrams)
+remove(dfmFivegrams)
+remove(fivegramsDT)
+
+# Extract 6-grams, create a document feature matrix, save in a data table and extract tail word
+sixgrams <- tokens_ngrams(myTokens, n = 6L, concatenator = "_")
+dfmSixgrams <- dfm(sixgrams)
+sixgramsDT <- data.table(ngram = featnames(dfmSixgrams), count = colSums(dfmSixgrams),
+                          stringsAsFactors = FALSE)
+tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
+sixgramsDT <- sixgramsDT[, tail := tailWords]
+
+saveRDS(sixgramsDT, file = "./data/sixgramsDT.rds")
+remove(sixgrams)
+remove(dfmSixgrams)
+remove(sixgramsDT)
+
+
 # Remove low frequency ngrams -----------------------------------------------------------
+
+
+# Combine into a single data table ------------------------------------------------------
+
+# Remove tail word from ngram column
 
 
