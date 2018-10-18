@@ -327,88 +327,11 @@ sixgramsDT <- sixgramsDT[count > 1, ]
 
 # Combine into a single data table ------------------------------------------------------
 
-# Combine unigrams and bigrams
-ngrams1 <- merge(unigramsDT, bigramsDT, by = "ngram", all = TRUE, no.dups = TRUE)
+# Create a tail column in the unigrams table
+unigramsDT <- mutate(unigramsDT, tail = rep("", nrow(unigramsDT)))
 
-# Set NA counts to zero
-ngrams1[is.na(ngrams1)] <- 0 
-
-# Sum counts
-ngrams1[, count1 := count.x + count.y]
-
-# Remove old count columns
-ngrams1[, count.x := NULL]
-ngrams1[, count.y := NULL]
-
-# Combine trigrams and quadgrams
-ngrams2 <- merge(trigramsDT, quadgramsDT, by = "ngram", all = TRUE, no.dups = TRUE)
-
-# Set NA counts to zero
-ngrams2[is.na(ngrams2)] <- 0 
-
-# Sum counts
-ngrams2[, count2 := count.x + count.y]
-
-# Remove old count columns
-ngrams2[, count.x := NULL]
-ngrams2[, count.y := NULL]
-
-# Create a single tail column for each tail word
-ngrams2[, tail := " "]
-
-for(i in nrow(ngrams2)) {
-        if(ngrams2[i]$tail.x == 0) {
-                ngrams2[i]$tail <- ngrams2[i]$tail.y
-        } else {
-                ngrams2[i]$tail <- ngrams2[i]$tail.x
-        }
-}
-
-
-# Combine fivegrams and sixgrams
-ngrams3 <- merge(fivegramsDT, sixgramsDT, by = "ngram", all = TRUE, no.dups = TRUE)
-
-# Set NA counts to zero
-ngrams3[is.na(ngrams3)] <- 0 
-
-# Sum counts
-ngrams3[, count3 := count.x + count.y]
-
-# Remove old count columns
-ngrams3[, count.x := NULL]
-ngrams3[, count.y := NULL]
-
-# Combine ngrams1 and ngrams2
-ngrams4 <- merge(ngrams1, ngrams2, by = "ngram", all = TRUE, no.dups = TRUE)
-
-# Set NA counts to zero
-ngrams4[is.na(ngrams4)] <- 0 
-
-# Sum counts
-ngrams4[, count4 := count1 + count2]
-
-# Remove old count columns
-ngrams4[, count1 := NULL]
-ngrams4[, count2 := NULL]
-
-# Create final merged data table
-ngrams <- merge(ngrams4, ngrams3, by = "ngram", all = TRUE, no.dups = TRUE)
-
-# Set NA counts to zero
-ngrams[is.na(ngrams)] <- 0 
-
-# Sum counts
-ngrams[, count := count3 + count4]
-
-# Remove old count columns
-ngrams[, count3 := NULL]
-ngrams[, count4 := NULL]
-
-
-remove(ngrams1)
-remove(ngrams2)
-remove(ngrams3)
-remove(ngrams4)
+# Combine ngrams
+ngrams <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
 
 remove(unigramsDT)
 remove(bigramsDT)
@@ -421,5 +344,10 @@ gc()
 
 # Index on ngram column
 setkey(ngrams, ngram)
+
+############################ Remove ngrams with profanities in the ngram
+
+
+# Stupid Backoff Prediction Algorithm --------------------------------------------------
 
 
