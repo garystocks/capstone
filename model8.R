@@ -191,6 +191,9 @@ gc()
 # Tokenise the corpus
 myTokens <- tokens(myCorpus, what = "word")
 
+remove(myCorpus)
+remove(corpusList)
+
 # Correct spelling of commonly mis-spelt words
 # See norvig.com/ngrams/spell-errors.txt OR see wikipedia's list of common english misspellings
 #
@@ -218,7 +221,7 @@ tailWords <- sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 2)
 bigramsDT <- bigramsDT[, tail := tailWords]
 
 # Remove tail word from ngram
-bigramsDT <- bigramsDT[, ngram := sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 1)]
+# bigramsDT <- bigramsDT[, ngram := sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 1)]
 
 # Save to file
 saveRDS(bigramsDT, file = "./data/bigramsDT.rds")
@@ -237,7 +240,7 @@ tailWords <- sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 3)
 trigramsDT <- trigramsDT[, tail := tailWords]
 
 # Remove tail word from ngram
-trigramsDT <- trigramsDT[, ngram := paste(sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 2), sep = "_")]
+# trigramsDT <- trigramsDT[, ngram := paste(sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 2), sep = "_")]
 
 # Save file
 saveRDS(trigramsDT, file = "./data/trigramsDT.rds")
@@ -256,7 +259,7 @@ tailWords <- sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
 quadgramsDT <- quadgramsDT[, tail := tailWords]
 
 # Remove tail word from each quadgram
-quadgramsDT <- quadgramsDT[, ngram := paste(sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sep = "_")]
+# quadgramsDT <- quadgramsDT[, ngram := paste(sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sep = "_")]
 
 # Save to file
 saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
@@ -275,7 +278,7 @@ tailWords <- sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4)
 fivegramsDT <- fivegramsDT[, tail := tailWords]
 
 # Remove tail word from each fivegram
-fivegramsDT <- fivegramsDT[, ngram := paste(sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4), sep = "_")]
+# fivegramsDT <- fivegramsDT[, ngram := paste(sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4), sep = "_")]
 
 saveRDS(fivegramsDT, file = "./data/fivegramsDT.rds")
 remove(fivegrams)
@@ -293,13 +296,14 @@ tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
 sixgramsDT <- sixgramsDT[, tail := tailWords]
 
 # Remove tail word from each sixgram
-sixgramsDT <- sixgramsDT[, ngram := paste(sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 5), sep = "_")]
+# sixgramsDT <- sixgramsDT[, ngram := paste(sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 5), sep = "_")]
 
 saveRDS(sixgramsDT, file = "./data/sixgramsDT.rds")
 remove(sixgrams)
 remove(dfmSixgrams)
 remove(sixgramsDT)
 
+remove(myTokens)
 gc()
 
 # Remove low frequency ngrams -----------------------------------------------------------
@@ -312,22 +316,94 @@ quadgramsDT <- readRDS("./data/quadgramsDT.rds")
 fivegramsDT <- readRDS("./data/fivegramsDT.rds")
 sixgramsDT <- readRDS("./data/sixgramsDT.rds")
 
-# Remove ngrams with counts of 3 or less
-unigramsDT <- unigramsDT[count > 3, ]
-bigramsDT <- bigramsDT[count > 3, ]
-trigramsDT <- trigramsDT[count > 3, ]
-quadgramsDT <- quadgramsDT[count > 3, ]
-fivegramsDT <- fivegramsDT[count > 3, ]
-sixgramsDT <- sixgramsDT[count > 3, ]
+# Remove ngrams with counts of 1 or less
+unigramsDT <- unigramsDT[count > 1, ]
+bigramsDT <- bigramsDT[count > 1, ]
+trigramsDT <- trigramsDT[count > 1, ]
+quadgramsDT <- quadgramsDT[count > 1, ]
+fivegramsDT <- fivegramsDT[count > 1, ]
+sixgramsDT <- sixgramsDT[count > 1, ]
 
 
 # Combine into a single data table ------------------------------------------------------
 
-ngrams1 <- merge(unigramsDT, bigramsDT, all = TRUE)
-ngrams2 <- merge(trigramsDT, quadgramsDT, all = TRUE)
-ngrams3 <- merge(fivegramsDT, sixgramsDT, all = TRUE)
-ngrams4 <- merge(ngrams1, ngrams2, all = TRUE)
-ngrams <- merge(ngrams4, ngrams3, all = TRUE)
+# Combine unigrams and bigrams
+ngrams1 <- merge(unigramsDT, bigramsDT, by = "ngram", all = TRUE, no.dups = TRUE)
+
+# Set NA counts to zero
+ngrams1[is.na(ngrams1)] <- 0 
+
+# Sum counts
+ngrams1[, count1 := count.x + count.y]
+
+# Remove old count columns
+ngrams1[, count.x := NULL]
+ngrams1[, count.y := NULL]
+
+# Combine trigrams and quadgrams
+ngrams2 <- merge(trigramsDT, quadgramsDT, by = "ngram", all = TRUE, no.dups = TRUE)
+
+# Set NA counts to zero
+ngrams2[is.na(ngrams2)] <- 0 
+
+# Sum counts
+ngrams2[, count2 := count.x + count.y]
+
+# Remove old count columns
+ngrams2[, count.x := NULL]
+ngrams2[, count.y := NULL]
+
+# Create a single tail column for each tail word
+ngrams2[, tail := " "]
+
+for(i in nrow(ngrams2)) {
+        if(ngrams2[i]$tail.x == 0) {
+                ngrams2[i]$tail <- ngrams2[i]$tail.y
+        } else {
+                ngrams2[i]$tail <- ngrams2[i]$tail.x
+        }
+}
+
+
+# Combine fivegrams and sixgrams
+ngrams3 <- merge(fivegramsDT, sixgramsDT, by = "ngram", all = TRUE, no.dups = TRUE)
+
+# Set NA counts to zero
+ngrams3[is.na(ngrams3)] <- 0 
+
+# Sum counts
+ngrams3[, count3 := count.x + count.y]
+
+# Remove old count columns
+ngrams3[, count.x := NULL]
+ngrams3[, count.y := NULL]
+
+# Combine ngrams1 and ngrams2
+ngrams4 <- merge(ngrams1, ngrams2, by = "ngram", all = TRUE, no.dups = TRUE)
+
+# Set NA counts to zero
+ngrams4[is.na(ngrams4)] <- 0 
+
+# Sum counts
+ngrams4[, count4 := count1 + count2]
+
+# Remove old count columns
+ngrams4[, count1 := NULL]
+ngrams4[, count2 := NULL]
+
+# Create final merged data table
+ngrams <- merge(ngrams4, ngrams3, by = "ngram", all = TRUE, no.dups = TRUE)
+
+# Set NA counts to zero
+ngrams[is.na(ngrams)] <- 0 
+
+# Sum counts
+ngrams[, count := count3 + count4]
+
+# Remove old count columns
+ngrams[, count3 := NULL]
+ngrams[, count4 := NULL]
+
 
 remove(ngrams1)
 remove(ngrams2)
