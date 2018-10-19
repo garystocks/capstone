@@ -204,6 +204,8 @@ unigrams <- tokens_ngrams(myTokens, n = 1L)
 dfmUnigrams <- dfm(unigrams)
 unigramsDT <- data.table(ngram = featnames(dfmUnigrams), count = colSums(dfmUnigrams), 
                          stringsAsFactors = FALSE)
+tailWords <- unigramsDT$ngram
+unigramsDT <- unigramsDT[, tail := tailWords]
 
 saveRDS(unigramsDT, file = "./data/unigramsDT.rds")
 remove(unigrams)
@@ -274,7 +276,7 @@ fivegrams <- tokens_ngrams(myTokens, n = 5L, concatenator = "_")
 dfmFivegrams <- dfm(fivegrams)
 fivegramsDT <- data.table(ngram = featnames(dfmFivegrams), count = colSums(dfmFivegrams),
                           stringsAsFactors = FALSE)
-tailWords <- sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4)
+tailWords <- sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 5)
 fivegramsDT <- fivegramsDT[, tail := tailWords]
 
 # Remove tail word from each fivegram
@@ -292,7 +294,7 @@ sixgrams <- tokens_ngrams(myTokens, n = 6L, concatenator = "_")
 dfmSixgrams <- dfm(sixgrams)
 sixgramsDT <- data.table(ngram = featnames(dfmSixgrams), count = colSums(dfmSixgrams),
                           stringsAsFactors = FALSE)
-tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
+tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 6)
 sixgramsDT <- sixgramsDT[, tail := tailWords]
 
 # Remove tail word from each sixgram
@@ -327,11 +329,8 @@ sixgramsDT <- sixgramsDT[count > 1, ]
 
 # Combine into a single data table ------------------------------------------------------
 
-# Create a tail column in the unigrams table
-unigramsDT <- mutate(unigramsDT, tail = rep("", nrow(unigramsDT)))
-
 # Combine ngrams
-ngrams <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
+ngramsDT <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
 
 remove(unigramsDT)
 remove(bigramsDT)
@@ -343,11 +342,38 @@ remove(sixgramsDT)
 gc()
 
 # Index on ngram column
-setkey(ngrams, ngram)
+setkey(ngramsDT, ngram)
 
 ############################ Remove ngrams with profanities in the ngram
+
+############################ Remove ngrams with words not in dictionary ???
 
 
 # Stupid Backoff Prediction Algorithm --------------------------------------------------
 
+# Extract last 5 words from input text
+input <- "she coped very well with"
+inputTokens <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
+              remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
+inputText <- inputTokens$text1[(length(inputTokens$text1)-4):length(inputTokens$text1)]
+inputString <- paste(inputText[1], inputText[2], inputText[3], inputText[4], inputText[5], sep = "_")
 
+# Prediction function
+myPrediction <- function(txt, ngrams) {
+        
+        # Find sixgrams
+        sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        sixgrams <- ngrams[ngram %like% txt]
+        
+        # Get the fivegram count
+        fivegram <- sixgrams[ngram == inputString]
+        
+        # Remove fivegram from sixgrams
+        sixgrams <- sixgrams[!(ngram == inputString)]
+        
+        # Calculate probabilities
+        sixgrams <- sixgrams[prob := count / fivegram$count]
+        
+}
