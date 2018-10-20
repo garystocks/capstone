@@ -27,6 +27,13 @@ profanity <- read.csv("profanity-list.csv", header=FALSE)
 saveRDS(profanity, file = "profanity.rds")
 
 
+# Get a list of commonly misspelt words ------------------------------------------------
+
+con <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/misspellings.txt"
+misspellings <- readLines(con)
+close(con)
+
+
 # Extract samples -----------------------------------------------------------------------
 
 ## NEED TO UPDATE THE SAMPLE CODE TO EXTRACT A TEST SET AT THE SAME TIME !!!
@@ -185,18 +192,29 @@ gc()
 
 # Create n-grams -------------------------------------------------------------------------
 
-## CREATE 5-grams as well !!!!
-## Put all n-grams into a single data.table??
-
 # Tokenise the corpus
 myTokens <- tokens(myCorpus, what = "word")
 
 remove(myCorpus)
 remove(corpusList)
 
-# Correct spelling of commonly mis-spelt words
-# See norvig.com/ngrams/spell-errors.txt OR see wikipedia's list of common english misspellings
-#
+# Remove profanities
+myTokens <- tokens_remove(myTokens, profanity$V1, valuetype = "fixed", 
+                          case_insensitive = TRUE, padding = TRUE, verbose = TRUE)
+
+# Correct spelling of commonly misspelt words
+for(i in 1:length(misspellings)) {
+        
+        # Separate correct spelling from common misspellings
+        correct <- sapply(strsplit(misspellings[i], "[:]"), '[[', 1)
+        incorrect <- sapply(strsplit(misspellings[i], "[:]"), '[[', 2)
+        incorrect <- strsplit(incorrect, "[,]")
+        incorrect <- trimws(incorrect, which = "both")
+        correct <- rep(correct, length(incorrect[[1]]))
+        
+        # Replace common misspellings with correct spelling
+        tokens_replace(myTokens, incorrect[[1]], replacement = correct, case_insensitive = TRUE, verbose = TRUE)
+}
 
 
 # Extract unigrams, create a document feature matrix, save in a data table
@@ -344,7 +362,6 @@ gc()
 # Index on ngram column
 setkey(ngramsDT, ngram)
 
-############################ Remove ngrams with profanities in the ngram
 
 ############################ Remove ngrams with words not in dictionary ???
 
@@ -356,24 +373,86 @@ input <- "she coped very well with"
 inputTokens <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
               remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
 inputText <- inputTokens$text1[(length(inputTokens$text1)-4):length(inputTokens$text1)]
-inputString <- paste(inputText[1], inputText[2], inputText[3], inputText[4], inputText[5], sep = "_")
+#inputString <- paste(inputText[1], inputText[2], inputText[3], inputText[4], inputText[5], sep = "_")
 
 # Prediction function
-myPrediction <- function(txt, ngrams) {
+myPrediction <- function(tkns, ngrams) {
+        
+        # Create denominator search terms
+        unigram <- tkns[5]
+        bigram <- paste(tkns[4], tkns[5], sep = "_")
+        trigram <- paste(tkns[3], tkns[4], tkns[5], sep = "_")
+        quadgram <- paste(tkns[2], tkns[3], tkns[4], tkns[5], sep = "_") 
+        fivegram <- paste(tkns[1], tkns[2], tkns[3], tkns[4], tkns[5], sep = "_")
+        
+        # Create numerator search terms
+        unigramPrefix <- paste(unigram, "_", sep = "")
+        bigramPrefix <- paste(bigram, "_", sep = "")
+        trigramPrefix <- paste(trigram, "_", sep = "")
+        quadgramPrefix <- paste(quadgram, "_", sep = "")
+        fivegramPrefix <- paste(fivegram, "_", sep = "")
         
         # Find sixgrams
         sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        sixgrams <- ngrams[ngram %like% txt]
+        sixgrams <- ngrams[ngram %like% fivegramPrefix]
         
         # Get the fivegram count
-        fivegram <- sixgrams[ngram == inputString]
+        denom <- ngrams[ngram == fivegram]
+     
+        # Calculate probabilities
+        sixgrams <- sixgrams[, prob := sixgrams$count / denom$count]
         
-        # Remove fivegram from sixgrams
-        sixgrams <- sixgrams[!(ngram == inputString)]
+        # Back off to fivegrams
+        fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        fivegrams <- ngrams[ngram %like% quadgramPrefix]
+        
+        # Get the quadgram count
+        denom <- ngrams[ngram == quadgram]
         
         # Calculate probabilities
-        sixgrams <- sixgrams[prob := count / fivegram$count]
+        fivegrams <- fivegrams[, prob := fivegrams$count / denom$count]
+        
+        # Back off to quadgrams
+        quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
+                                count = vector(mode = "integer", length = 0),
+                                tail = vector(mode = "character", length = 0))
+        quadgrams <- ngrams[ngram %like% trigramPrefix]
+        
+        # Get the quadgram count
+        denom <- ngrams[ngram == trigram]
+        
+        # Calculate probabilities
+        quadgrams <- quadgrams[, prob := quadgrams$count / denom$count]
+        
+        # Back off to trigrams
+        trigrams <- data.table(ngram = vector(mode = "character", length = 0),
+                                count = vector(mode = "integer", length = 0),
+                                tail = vector(mode = "character", length = 0))
+        trigrams <- ngrams[ngram %like% bigramPrefix]
+        
+        # Get the quadgram count
+        denom <- ngrams[ngram == bigram]
+        
+        # Calculate probabilities
+        trigrams <- trigrams[, prob := trigrams$count / denom$count]
+        
+        # Back off to bigrams
+        bigrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        bigrams <- ngrams[ngram %like% unigramPrefix]
+        
+        # Get the quadgram count
+        denom <- ngrams[ngram == unigram]
+        
+        # Calculate probabilities
+        bigrams <- bigrams[, prob := bigrams$count / denom$count]
+        
+        # Back off to unigrams
+        
         
 }
