@@ -58,7 +58,7 @@ sampleFile <- function(infile, outfile, header = TRUE) {
                         return(numout)
                 }
                 recnum <- recnum + 1
-                if (rbinom(1, 1, prob = .1) == 1) {
+                if (rbinom(1, 1, prob = .8) == 1) {
                         numout <- numout + 1
                         writeLines(inrec, co)
                 }
@@ -350,6 +350,11 @@ sixgramsDT <- sixgramsDT[count > 1, ]
 # Combine ngrams
 ngramsDT <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
 
+# Label ngrams
+ngramsDT <- ngramsDT[, n := c(rep(1, nrow(unigramsDT)), rep(2, nrow(bigramsDT)),
+                              rep(3, nrow(trigramsDT)), rep(4, nrow(quadgramsDT)),
+                              rep(5, nrow(fivegramsDT)), rep(6, nrow(sixgramsDT)))]
+
 remove(unigramsDT)
 remove(bigramsDT)
 remove(trigramsDT)
@@ -396,37 +401,60 @@ myPrediction <- function(tkns, ngrams) {
         sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        sixgrams <- ngrams[ngram %like% fivegramPrefix]
+        sixgrams <- ngrams[n == 6][ngram %like% fivegramPrefix]
         
         # Get the fivegram count
         denom <- ngrams[ngram == fivegram]
      
         # Calculate probabilities
-        sixgrams <- sixgrams[, prob := sixgrams$count / denom$count]
+        if(nrow(denom) > 0) {
+                sixgrams <- sixgrams[, prob := sixgrams$count / denom$count]
+        }
+        
+        # Find unobserved sixgrams
+        # First get the tail words of unobserved sixgrams
+        observedSixgramTails <- sixgrams[, tail]
+        unobservedSixgramTails <- ngrams[n == 1][!(ngram %in% observedSixgramTails)]
         
         # Back off to fivegrams
         fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        fivegrams <- ngrams[ngram %like% quadgramPrefix]
+        fivegrams <- ngrams[n == 5][ngram %like% quadgramPrefix]
+        
+        # Exclude fivegrams which end in the tail word of sixgrams found
+        fivegrams <- fivegrams[!(tail %in% observedSixgramTails)]
+        
+        # Note observed fivegram tail words
+        observedFivegramTails <- fivegrams[, tail]
         
         # Get the quadgram count
         denom <- ngrams[ngram == quadgram]
         
         # Calculate probabilities
-        fivegrams <- fivegrams[, prob := fivegrams$count / denom$count]
+        if(nrow(denom) > 0) {
+                fivegrams <- fivegrams[, prob := (fivegrams$count / denom$count) * .4]
+        }
         
         # Back off to quadgrams
         quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        quadgrams <- ngrams[ngram %like% trigramPrefix]
+        quadgrams <- ngrams[n == 4][ngram %like% trigramPrefix]
         
-        # Get the quadgram count
+        # Exclude quadgrams with tail words already observed
+        quadgrams <- quadgrams[!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)]
+        
+        # Note the observed quadgram tail words
+        observedQuadgramTails <- quadgrams[, tail]
+        
+        # Get the trigram count
         denom <- ngrams[ngram == trigram]
         
         # Calculate probabilities
-        quadgrams <- quadgrams[, prob := quadgrams$count / denom$count]
+        if(nrow(denom) > 0) {
+                quadgrams <- quadgrams[, prob := (quadgrams$count / denom$count) * .4]
+        }
         
         # Back off to trigrams
         trigrams <- data.table(ngram = vector(mode = "character", length = 0),
@@ -434,11 +462,19 @@ myPrediction <- function(tkns, ngrams) {
                                 tail = vector(mode = "character", length = 0))
         trigrams <- ngrams[ngram %like% bigramPrefix]
         
-        # Get the quadgram count
+        # Exclude trigrams with tail words already observed
+        trigrams <- trigrams[!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)][!(tail %in% observedQuadgramTails)]
+        
+        # Note the observed trigram tail words
+        observedTrigramTails <- trigrams[, tail]
+        
+        # Get the bigram count
         denom <- ngrams[ngram == bigram]
         
         # Calculate probabilities
-        trigrams <- trigrams[, prob := trigrams$count / denom$count]
+        if(nrow(denom) > 0) {
+                trigrams <- trigrams[, prob := (trigrams$count / denom$count) * .4]
+        }
         
         # Back off to bigrams
         bigrams <- data.table(ngram = vector(mode = "character", length = 0),
@@ -446,13 +482,40 @@ myPrediction <- function(tkns, ngrams) {
                                tail = vector(mode = "character", length = 0))
         bigrams <- ngrams[ngram %like% unigramPrefix]
         
-        # Get the quadgram count
+        # Exclude bigrams with tail words already observed
+        bigrams <- bigrams[!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)][!(tail %in% observedQuadgramTails)][!(tail %in% observedTrigramTails)]
+        
+        # Note the observed bigram tail words
+        observedBigramTails <- bigrams[, tail]
+        
+        # Get the unigram count
         denom <- ngrams[ngram == unigram]
         
         # Calculate probabilities
-        bigrams <- bigrams[, prob := bigrams$count / denom$count]
+        if(nrow(denom) > 0) {
+                bigrams <- bigrams[, prob := (bigrams$count / denom$count) * .4]
+        }
         
         # Back off to unigrams
+        unigrams <- data.table(ngram = vector(mode = "character", length = 0),
+                              count = vector(mode = "integer", length = 0),
+                              tail = vector(mode = "character", length = 0))
         
+        # Get unigrams which were not observed as tail words for any observed ngram
+        unigrams <- ngrams[n == 1][!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)][!(tail %in% observedQuadgramTails)][!(tail %in% observedTrigramTails)][!(tail %in% observedBigramTails)]
         
+        # Get the total unigram count
+        denom <- ngrams[n == 1][, sum(count)]
+        
+        # Calculate MLEs
+        if(denom > 0) {
+                unigrams <- unigrams[, prob := (unigrams$count / denom) * .4]
+        }
+        
+        # Put all the MLEs into a single table
+        MLEs <- rbind(sixgrams, fivegrams, quadgrams, trigrams, bigrams, unigrams, fill = TRUE)
+        MLEs <- MLEs[order(-MLEs$prob), ]
+        
+        return(MLEs)
 }
+
