@@ -58,7 +58,7 @@ sampleFile <- function(infile, outfile, header = TRUE) {
                         return(numout)
                 }
                 recnum <- recnum + 1
-                if (rbinom(1, 1, prob = .8) == 1) {
+                if (rbinom(1, 1, prob = 1) == 1) {
                         numout <- numout + 1
                         writeLines(inrec, co)
                 }
@@ -71,19 +71,11 @@ sampleFile(t, "twitter.txt", header = FALSE)
 
 twitter <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
 
-#con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt", "r")
-#twitter <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
-#close(con) 
-
 # Extract news sample
 n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
 sampleFile(n, "news.txt", header = FALSE)
 
 news <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
-
-#con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt", "r")
-#news <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
-#close(con)
 
 # Extract blogs sample
 b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
@@ -91,92 +83,28 @@ sampleFile(b, "blogs.txt", header = FALSE)
 
 blogs <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
 
-#con <- file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt", "r")
-#blogs <- readLines(con, encoding = 'UTF-8', skipNul = TRUE) 
-#close(con)
-
-
-# Clean text ---------------------------------------------------------------------------
-
-# Function to clean text
-cleanText <- function(txt) {
-        
-        # Remove non-ASCII characters
-        txt <- iconv(txt, "latin1", "ASCII", sub = "")
-        
-        # Remove smileys
-        txt <- gsub("<3|</3|\\bxd\\b|\\bx-d\\b|:&|:-&|:p\\b|:-p\\b|
-              \\b=p\\b|\\b:d\\b|;d\\b|\\b:o\\)\\b|\\b8\\)|\\b8d
-                     \\b|\\b8-d\\b|:3\\b|:-x\\b|:x\\b|:o\\)|:-d\\b|:-o
-                     \\b|:o\\b|o_o\\b|o-o\\b|=p\\b|:s\\b|\\bd:", " ", txt)
-        
-        # Remove RTs
-        txt <- gsub("\\brt\\b", " ", txt)
-        txt <- gsub("rt2win", " ", txt)
-        txt <- gsub("<3RT", " ", txt)
-        
-        # Change symbols & / to words
-        txt<- gsub("\\&", " and ", txt)
-        txt <-gsub("\\/", " or ", txt)
-        
-        # Remove full stops in abbreviations
-        txt <- gsub("\\s([A-Z])\\.\\s", " \\1", txt)
-        txt <- gsub("\\s([A-Z][a-z]{1,3})\\.\\s", " \\1", txt)
-        txt <- gsub("^([A-Z])\\.\\s", " \\1", txt)
-        txt <- gsub("^([A-Z][a-z]{1,3})\\.\\s", " \\1", txt)
-        
-        # Convert to lower case
-        txt<- tolower(txt)
-        
-        # Replace :.?! with end of sentence tags <eos>
-        # and eliminate other punctuation except apostrophes
-        txt<- gsub("[:.?!]+", " EOS ", gsub("(?![:.?!'])[[:punct:]]", " ", txt, perl=T))
-        
-        # Remove errant apostrohes
-        txt<-gsub(" ' "," ", txt)        
-        txt<-gsub("\\' ", " ", txt)
-        txt<-gsub("^'", "", txt)
-        
-        # Replaces number with number tag <num>
-        txt<- gsub("[0-9]+"," NUM ", txt)
-        
-        # Removes website Url
-        txt <-gsub(" www(.+) ", " ", txt)
-        
-        # Remove extra spaces
-        txt<- gsub("^[ ]","",txt)
-        txt<- gsub("[ ]$", "", txt)
-        txt<- stripWhitespace(txt)
-        
-        return(txt)
-}
-
-# Clean samples
-twitterClean <- cleanText(twitter)
-newsClean <- cleanText(news)
-blogsClean <- cleanText(blogs)
-
-# Save files
-saveRDS(twitterClean, file = "./data/twitter.txt")
-saveRDS(newsClean, file = "./data/news.txt")
-saveRDS(blogsClean, file = "./data/blogs.txt")
 
 # Create corpus --------------------------------------------------------------------------
 
+# Open text files
+twitterClean <- openRDS("./data/twitter.txt")
+newsClean <- openRDS("./data/news.txt")
+blogsClean <- openRDS("./data/blogs.txt")
+
 # Build 3 corpii and reshape to sentences
-twitterCorpus <- quanteda::corpus(twitterClean)
+twitterCorpus <- quanteda::corpus(twitter)
 twitterCorpus <- corpus_reshape(twitterCorpus, to = "sentences")
-remove(twitterClean)
+remove(twitter)
 gc()
 
-newsCorpus <- quanteda::corpus(newsClean)
+newsCorpus <- quanteda::corpus(news)
 newsCorpus <- corpus_reshape(newsCorpus, to = "sentences")
-remove(newsClean)
+remove(news)
 gc()
 
-blogsCorpus <- quanteda::corpus(blogsClean)
+blogsCorpus <- quanteda::corpus(blogs)
 blogsCorpus <- corpus_reshape(blogsCorpus, to = "sentences")
-remove(blogsClean)
+remove(blogs)
 gc()
 
 # Combine text vectors
@@ -193,12 +121,14 @@ gc()
 # Create n-grams -------------------------------------------------------------------------
 
 # Tokenise the corpus
-myTokens <- tokens(myCorpus, what = "word")
+myTokens <- tokens(myCorpus, what = "word", remove_punct = TRUE, remove_symbols = TRUE,
+                   remove_separators = TRUE, remove_twitter = TRUE, remove_url = TRUE)
 
 remove(myCorpus)
 remove(corpusList)
 
 # Remove profanities
+profanity <- readRDS("profanity.rds")
 myTokens <- tokens_remove(myTokens, profanity$V1, valuetype = "fixed", 
                           case_insensitive = TRUE, padding = TRUE, verbose = TRUE)
 
@@ -290,12 +220,36 @@ remove(quadgramsDT)
 gc()
 
 # Extract 5-grams, create a document feature matrix, save in a data table and extract tail word
-fivegrams <- tokens_ngrams(myTokens, n = 5L, concatenator = "_")
-dfmFivegrams <- dfm(fivegrams)
-fivegramsDT <- data.table(ngram = featnames(dfmFivegrams), count = colSums(dfmFivegrams),
+# First divide tokens to process
+myTokens1 <- tokens_subset(myTokens, 1:2409649)
+myTokens2 <- tokens_subset(myTokens, 2409649:4819298)
+remove(myTokens)
+
+fivegrams1 <- tokens_ngrams(myTokens1, n = 5L, concatenator = "_")
+dfmFivegrams1 <- dfm(fivegrams1)
+remove(fivegrams1)
+
+fivegrams2 <- tokens_ngrams(myTokens2, n = 5L, concatenator = "_")
+dfmFivegrams2 <- dfm(fivegrams2)
+remove(fivegrams2)
+
+fivegramsDT1 <- data.table(ngram = featnames(dfmFivegrams1), count = colSums(dfmFivegrams1),
                           stringsAsFactors = FALSE)
-tailWords <- sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 5)
-fivegramsDT <- fivegramsDT[, tail := tailWords]
+fivegramsDT2 <- data.table(ngram = featnames(dfmFivegrams2), count = colSums(dfmFivegrams2),
+                           stringsAsFactors = FALSE)
+
+remove(dfmFivegrams1)
+remove(dfmFivegrams2)
+
+gc()
+
+tailWords1 <- sapply(strsplit(fivegramsDT1$ngram, "_", fixed = TRUE), '[[', 5)
+fivegramsDT1 <- fivegramsDT1[, tail := tailWords1]
+
+tailWords2 <- sapply(strsplit(fivegramsDT2$ngram, "_", fixed = TRUE), '[[', 5)
+fivegramsDT2 <- fivegramsDT2[, tail := tailWords2]
+
+#### Merge data tables ################
 
 # Remove tail word from each fivegram
 # fivegramsDT <- fivegramsDT[, ngram := paste(sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4), sep = "_")]
@@ -310,8 +264,10 @@ gc()
 # Extract 6-grams, create a document feature matrix, save in a data table and extract tail word
 sixgrams <- tokens_ngrams(myTokens, n = 6L, concatenator = "_")
 dfmSixgrams <- dfm(sixgrams)
+remove(sixgrams)
 sixgramsDT <- data.table(ngram = featnames(dfmSixgrams), count = colSums(dfmSixgrams),
                           stringsAsFactors = FALSE)
+remove(sixgramsDT)
 tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 6)
 sixgramsDT <- sixgramsDT[, tail := tailWords]
 
@@ -325,6 +281,7 @@ remove(sixgramsDT)
 
 remove(myTokens)
 gc()
+
 
 # Remove low frequency ngrams -----------------------------------------------------------
 
@@ -374,7 +331,7 @@ setkey(ngramsDT, ngram)
 # Stupid Backoff Prediction Algorithm --------------------------------------------------
 
 # Extract last 5 words from input text
-input <- "she coped very well with"
+input <- "Offense still struggling but the"
 inputTokens <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
               remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
 inputText <- inputTokens$text1[(length(inputTokens$text1)-4):length(inputTokens$text1)]
