@@ -26,12 +26,14 @@ profanity <- read.csv("profanity-list.csv", header=FALSE)
 # Save to file
 saveRDS(profanity, file = "profanity.rds")
 
+remove(profanity)
+
 
 # Get a list of commonly misspelt words ------------------------------------------------
 
-con <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/misspellings.txt"
-misspellings <- readLines(con)
-close(con)
+#con <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/misspellings.txt"
+#misspellings <- readLines(con)
+#close(con)
 
 
 # Extract samples -----------------------------------------------------------------------
@@ -84,12 +86,15 @@ sampleFile(b, "blogs.txt", header = FALSE)
 blogs <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
 
 
-# Create corpus --------------------------------------------------------------------------
+# Clean text -----------------------------------------------------------------------------
 
-# Open text files
-twitterClean <- openRDS("./data/twitter.txt")
-newsClean <- openRDS("./data/news.txt")
-blogsClean <- openRDS("./data/blogs.txt")
+# Remove non-ASCII characters
+twitter <- stringi::stri_trans_general(twitter, "latin-ascii")
+news <- stringi::stri_trans_general(news, "latin-ascii")
+blogs <- stringi::stri_trans_general(blogs, "latin-ascii")
+
+
+# Create corpus --------------------------------------------------------------------------
 
 # Build 3 corpii and reshape to sentences
 twitterCorpus <- quanteda::corpus(twitter)
@@ -121,8 +126,9 @@ gc()
 # Create n-grams -------------------------------------------------------------------------
 
 # Tokenise the corpus
-myTokens <- tokens(myCorpus, what = "word", remove_punct = TRUE, remove_symbols = TRUE,
-                   remove_separators = TRUE, remove_twitter = TRUE, remove_url = TRUE)
+myTokens <- tokens(myCorpus, what = "word", remove_numbers = TRUE, remove_punct = TRUE, 
+                   remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE, 
+                   remove_url = TRUE)
 
 remove(myCorpus)
 remove(corpusList)
@@ -131,20 +137,24 @@ remove(corpusList)
 profanity <- readRDS("profanity.rds")
 myTokens <- tokens_remove(myTokens, profanity$V1, valuetype = "fixed", 
                           case_insensitive = TRUE, padding = TRUE, verbose = TRUE)
+remove(profanity)
+
+# Save tokens
+saveRDS(myTokens, file = "./data/myTokens.rds")
 
 # Correct spelling of commonly misspelt words
-for(i in 1:length(misspellings)) {
+#for(i in 1:length(misspellings)) {
         
         # Separate correct spelling from common misspellings
-        correct <- sapply(strsplit(misspellings[i], "[:]"), '[[', 1)
-        incorrect <- sapply(strsplit(misspellings[i], "[:]"), '[[', 2)
-        incorrect <- strsplit(incorrect, "[,]")
-        incorrect <- trimws(incorrect, which = "both")
-        correct <- rep(correct, length(incorrect[[1]]))
+#        correct <- sapply(strsplit(misspellings[i], "[:]"), '[[', 1)
+#        incorrect <- sapply(strsplit(misspellings[i], "[:]"), '[[', 2)
+#        incorrect <- strsplit(incorrect, "[,]")
+#        incorrect <- trimws(incorrect, which = "both")
+#        correct <- rep(correct, length(incorrect[[1]]))
         
         # Replace common misspellings with correct spelling
-        tokens_replace(myTokens, incorrect[[1]], replacement = correct, case_insensitive = TRUE, verbose = TRUE)
-}
+#        tokens_replace(myTokens, incorrect[[1]], replacement = correct, case_insensitive = TRUE, verbose = TRUE)
+#}
 
 
 # Extract unigrams, create a document feature matrix, save in a data table
@@ -159,6 +169,7 @@ saveRDS(unigramsDT, file = "./data/unigramsDT.rds")
 remove(unigrams)
 remove(dfmUnigrams)
 remove(unigramsDT)
+remove(tailWords)
 
 gc()
 
@@ -178,6 +189,7 @@ saveRDS(bigramsDT, file = "./data/bigramsDT.rds")
 remove(bigrams)
 remove(dfmBigrams)
 remove(bigramsDT)
+remove(tailWords)
 
 gc()
 
@@ -197,6 +209,7 @@ saveRDS(trigramsDT, file = "./data/trigramsDT.rds")
 remove(trigrams)
 remove(dfmTrigrams)
 remove(trigramsDT)
+remove(tailWords)
 
 gc()
 
@@ -216,89 +229,135 @@ saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
 remove(quadgrams)
 remove(dfmQuadgrams)
 remove(quadgramsDT)
+remove(tailWords)
 
 gc()
 
 # Extract 5-grams, create a document feature matrix, save in a data table and extract tail word
 # First divide tokens to process
-myTokens1 <- tokens_subset(myTokens, 1:2409649)
-myTokens2 <- tokens_subset(myTokens, 2409649:4819298)
+myTokens1 <- myTokens[1:2409649]
+myTokens2 <- myTokens[2409650:4835363]
 remove(myTokens)
 
 fivegrams1 <- tokens_ngrams(myTokens1, n = 5L, concatenator = "_")
 dfmFivegrams1 <- dfm(fivegrams1)
 remove(fivegrams1)
+fivegramsDT1 <- data.table(ngram = featnames(dfmFivegrams1), count = colSums(dfmFivegrams1),
+                           stringsAsFactors = FALSE)
+remove(dfmFivegrams1)
+
+gc() 
 
 fivegrams2 <- tokens_ngrams(myTokens2, n = 5L, concatenator = "_")
 dfmFivegrams2 <- dfm(fivegrams2)
 remove(fivegrams2)
-
-fivegramsDT1 <- data.table(ngram = featnames(dfmFivegrams1), count = colSums(dfmFivegrams1),
-                          stringsAsFactors = FALSE)
 fivegramsDT2 <- data.table(ngram = featnames(dfmFivegrams2), count = colSums(dfmFivegrams2),
                            stringsAsFactors = FALSE)
-
-remove(dfmFivegrams1)
 remove(dfmFivegrams2)
 
 gc()
 
-tailWords1 <- sapply(strsplit(fivegramsDT1$ngram, "_", fixed = TRUE), '[[', 5)
-fivegramsDT1 <- fivegramsDT1[, tail := tailWords1]
+# Merge data tables and combine counts
+fivegramsDT <- merge(fivegramsDT1, fivegramsDT2, by = "ngram", all = TRUE)
+remove(fivegramsDT1)
+remove(fivegramsDT2)
+fivegramsDT[is.na(count.x)]$count.x <- 0
+fivegramsDT[is.na(count.y)]$count.y <- 0
+fivegramsDT <- fivegramsDT[, count := count.x + count.y]
+fivegramsDT <- fivegramsDT[, count.x := NULL]
+fivegramsDT <- fivegramsDT[, count.y := NULL]
 
-tailWords2 <- sapply(strsplit(fivegramsDT2$ngram, "_", fixed = TRUE), '[[', 5)
-fivegramsDT2 <- fivegramsDT2[, tail := tailWords2]
-
-#### Merge data tables ################
+tailWords <- sapply(strsplit(fivegramsDT$ngram[1:10000000], "_", fixed = TRUE), '[[', 5)
+fivegramsDT <- fivegramsDT[1:10000000, tail := tailWords]
+tailWords <- sapply(strsplit(fivegramsDT$ngram[10000001:20000000], "_", fixed = TRUE), '[[', 5)
+fivegramsDT <- fivegramsDT[10000001:20000000, tail := tailWords]
+tailWords <- sapply(strsplit(fivegramsDT$ngram[20000001:30000000], "_", fixed = TRUE), '[[', 5)
+fivegramsDT <- fivegramsDT[20000001:30000000, tail := tailWords]
+tailWords <- sapply(strsplit(fivegramsDT$ngram[30000001:46871267], "_", fixed = TRUE), '[[', 5)
+fivegramsDT <- fivegramsDT[30000001:46871267, tail := tailWords]
 
 # Remove tail word from each fivegram
 # fivegramsDT <- fivegramsDT[, ngram := paste(sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4), sep = "_")]
 
 saveRDS(fivegramsDT, file = "./data/fivegramsDT.rds")
-remove(fivegrams)
-remove(dfmFivegrams)
 remove(fivegramsDT)
 
 gc()
 
 # Extract 6-grams, create a document feature matrix, save in a data table and extract tail word
-sixgrams <- tokens_ngrams(myTokens, n = 6L, concatenator = "_")
-dfmSixgrams <- dfm(sixgrams)
-remove(sixgrams)
-sixgramsDT <- data.table(ngram = featnames(dfmSixgrams), count = colSums(dfmSixgrams),
+sixgrams1 <- tokens_ngrams(myTokens1, n = 6L, concatenator = "_")
+dfmSixgrams1 <- dfm(sixgrams1)
+remove(sixgrams1)
+sixgramsDT1 <- data.table(ngram = featnames(dfmSixgrams1), count = colSums(dfmSixgrams1),
                           stringsAsFactors = FALSE)
-remove(sixgramsDT)
-tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 6)
-sixgramsDT <- sixgramsDT[, tail := tailWords]
+remove(dfmSixgrams1)
+
+saveRDS(sixgramsDT1, file = "./data/sixgramsDT1.rds")
+remove(sixgramsDT1)
+
+gc()
+
+sixgrams2 <- tokens_ngrams(myTokens2, n = 6L, concatenator = "_")
+dfmSixgrams2 <- dfm(sixgrams2)
+remove(sixgrams2)
+sixgramsDT2 <- data.table(ngram = featnames(dfmSixgrams2), count = colSums(dfmSixgrams2),
+                          stringsAsFactors = FALSE)
+remove(dfmSixgrams2)
+
+gc()
+
+# Merge data tables and combine counts
+sixgramsDT1 <- readRDS("./data/sixgramsDT1.rds")
+sixgramsDT <- merge(sixgramsDT1, sixgramsDT2, by = "ngram", all = TRUE)
+remove(sixgramsDT1)
+remove(sixgramsDT2)
+sixgramsDT[is.na(count.x)]$count.x <- 0
+sixgramsDT[is.na(count.y)]$count.y <- 0
+sixgramsDT <- sixgramsDT[, count := count.x + count.y]
+sixgramsDT <- sixgramsDT[, count.x := NULL]
+sixgramsDT <- sixgramsDT[, count.y := NULL]
+
+tailWords <- sapply(strsplit(sixgramsDT$ngram[1:10000000], "_", fixed = TRUE), '[[', 6)
+sixgramsDT <- sixgramsDT[1:10000000, tail := tailWords]
+tailWords <- sapply(strsplit(sixgramsDT$ngram[10000001:20000000], "_", fixed = TRUE), '[[', 6)
+sixgramsDT <- sixgramsDT[10000001:20000000, tail := tailWords]
+tailWords <- sapply(strsplit(sixgramsDT$ngram[20000001:30000000], "_", fixed = TRUE), '[[', 6)
+sixgramsDT <- sixgramsDT[20000001:30000000, tail := tailWords]
+tailWords <- sapply(strsplit(sixgramsDT$ngram[30000001:45227515], "_", fixed = TRUE), '[[', 6)
+sixgramsDT <- sixgramsDT[30000001:45227515, tail := tailWords]
+
+remove(tailWords)
 
 # Remove tail word from each sixgram
 # sixgramsDT <- sixgramsDT[, ngram := paste(sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 5), sep = "_")]
 
 saveRDS(sixgramsDT, file = "./data/sixgramsDT.rds")
-remove(sixgrams)
-remove(dfmSixgrams)
 remove(sixgramsDT)
 
-remove(myTokens)
+remove(myTokens1)
+remove(myTokens2)
 gc()
 
 
 # Remove low frequency ngrams -----------------------------------------------------------
 
-# Open files
+# Open files and remove ngrams with counts of 1 or less
 unigramsDT <- readRDS("./data/unigramsDT.rds")
-bigramsDT <- readRDS("./data/bigramsDT.rds")
-trigramsDT <- readRDS("./data/trigramsDT.rds")
-quadgramsDT <- readRDS("./data/quadgramsDT.rds")
-fivegramsDT <- readRDS("./data/fivegramsDT.rds")
-sixgramsDT <- readRDS("./data/sixgramsDT.rds")
-
-# Remove ngrams with counts of 1 or less
 unigramsDT <- unigramsDT[count > 1, ]
+
+bigramsDT <- readRDS("./data/bigramsDT.rds")
 bigramsDT <- bigramsDT[count > 1, ]
+
+trigramsDT <- readRDS("./data/trigramsDT.rds")
 trigramsDT <- trigramsDT[count > 1, ]
+
+quadgramsDT <- readRDS("./data/quadgramsDT.rds")
 quadgramsDT <- quadgramsDT[count > 1, ]
+
+fivegramsDT <- readRDS("./data/fivegramsDT.rds")
 fivegramsDT <- fivegramsDT[count > 1, ]
+
+sixgramsDT <- readRDS("./data/sixgramsDT.rds")
 sixgramsDT <- sixgramsDT[count > 1, ]
 
 
@@ -323,6 +382,9 @@ gc()
 
 # Index on ngram column
 setkey(ngramsDT, ngram)
+
+# Save
+saveRDS(ngramsDT, file = "./data/ngramsDT.rds")
 
 
 ############################ Remove ngrams with words not in dictionary ???
