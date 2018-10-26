@@ -181,9 +181,6 @@ bigramsDT <- data.table(ngram = featnames(dfmBigrams), count = colSums(dfmBigram
 tailWords <- sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 2)
 bigramsDT <- bigramsDT[, tail := tailWords]
 
-# Remove tail word from ngram
-# bigramsDT <- bigramsDT[, ngram := sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 1)]
-
 # Save to file
 saveRDS(bigramsDT, file = "./data/bigramsDT.rds")
 remove(bigrams)
@@ -363,6 +360,12 @@ sixgramsDT <- sixgramsDT[count > 1, ]
 
 # Combine into a single data table ------------------------------------------------------
 
+# Remove tail word from the ngram
+
+# Remove tail word from bigrams
+bigramsDT <- bigramsDT[, ngram := sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 1)]
+
+
 # Combine ngrams
 ngramsDT <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
 
@@ -381,7 +384,7 @@ remove(sixgramsDT)
 gc()
 
 # Index on ngram column
-setkey(ngramsDT, ngram)
+setkey(ngramsDT, n, ngram)
 
 # Save
 saveRDS(ngramsDT, file = "./data/ngramsDT.rds")
@@ -397,6 +400,7 @@ input <- "Offense still struggling but the"
 inputTokens <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
               remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
 inputText <- inputTokens$text1[(length(inputTokens$text1)-4):length(inputTokens$text1)]
+inputText <- tolower(inputText)
 #inputString <- paste(inputText[1], inputText[2], inputText[3], inputText[4], inputText[5], sep = "_")
 
 # Prediction function
@@ -410,20 +414,20 @@ myPrediction <- function(tkns, ngrams) {
         fivegram <- paste(tkns[1], tkns[2], tkns[3], tkns[4], tkns[5], sep = "_")
         
         # Create numerator search terms
-        unigramPrefix <- paste(unigram, "_", sep = "")
-        bigramPrefix <- paste(bigram, "_", sep = "")
-        trigramPrefix <- paste(trigram, "_", sep = "")
-        quadgramPrefix <- paste(quadgram, "_", sep = "")
-        fivegramPrefix <- paste(fivegram, "_", sep = "")
+        unigramPrefix <- paste("^", unigram, "_", sep = "")
+        bigramPrefix <- paste("^", bigram, "_", sep = "")
+        trigramPrefix <- paste("^", trigram, "_", sep = "")
+        quadgramPrefix <- paste("^", quadgram, "_", sep = "")
+        fivegramPrefix <- paste("^", fivegram, "_", sep = "")
         
         # Find sixgrams
         sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        sixgrams <- ngrams[n == 6][ngram %like% fivegramPrefix]
+        sixgrams <- ngrams[n == 6 & ngram %like% fivegramPrefix]
         
         # Get the fivegram count
-        denom <- ngrams[ngram == fivegram]
+        denom <- ngrams[.(5,fivegram)]
      
         # Calculate probabilities
         if(nrow(denom) > 0) {
@@ -433,13 +437,13 @@ myPrediction <- function(tkns, ngrams) {
         # Find unobserved sixgrams
         # First get the tail words of unobserved sixgrams
         observedSixgramTails <- sixgrams[, tail]
-        unobservedSixgramTails <- ngrams[n == 1][!(ngram %in% observedSixgramTails)]
+        unobservedSixgramTails <- ngrams[n == 1 & !(tail %in% observedSixgramTails)]
         
         # Back off to fivegrams
         fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        fivegrams <- ngrams[n == 5][ngram %like% quadgramPrefix]
+        fivegrams <- ngrams[.(5, quadgramPrefix)]
         
         # Exclude fivegrams which end in the tail word of sixgrams found
         fivegrams <- fivegrams[!(tail %in% observedSixgramTails)]
