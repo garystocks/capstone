@@ -357,18 +357,6 @@ sixgramsDT <- sixgramsDT[, ngram := paste(sapply(strsplit(sixgramsDT$ngram, "_",
 
 # Combine into a single data table ------------------------------------------------------
 
-# Remove tail word from the ngram
-
-# Remove tail word from bigrams
-
-# Remove tail word from ngram
-
-# Remove tail word from each quadgram
-
-# Remove tail word from each fivegram
-
-# Remove tail word from each sixgram
-
 # Combine ngrams
 ngramsDT <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
 
@@ -399,7 +387,7 @@ saveRDS(ngramsDT, file = "./data/ngramsDT.rds")
 # Stupid Backoff Prediction Algorithm --------------------------------------------------
 
 # Extract last 5 words from input text
-input <- "Offense still struggling but the"
+input <- "seen, then you must be"
 inputTokens <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
               remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
 inputText <- inputTokens$text1[(length(inputTokens$text1)-4):length(inputTokens$text1)]
@@ -438,7 +426,12 @@ myPrediction <- function(tkns, ngrams) {
         
         # Find unobserved sixgrams
         # First get the tail words of unobserved sixgrams
-        observedSixgramTails <- sixgrams[, tail]$tail
+        if(nrow(sixgrams) > 0) {
+                observedSixgramTails <- sixgrams[, tail]
+        } else {
+                observedSixgramTails <- as.character()
+        }
+        
         unobservedSixgramTails <- ngrams[n == 1][!(tail %in% observedSixgramTails)]$tail
         
         # Back off to fivegrams
@@ -448,10 +441,11 @@ myPrediction <- function(tkns, ngrams) {
         fivegrams <- ngrams[ngram == quadgram][!(tail %in% observedSixgramTails)]
         
         # Note observed fivegram tail words
-        observedFivegramTails <- fivegrams[, tail]$tail
-        
-        # Update observedSixgramTails
-        observedSixgramTails <- c(observedSixgramTails, observedFivegramTails)
+        if(nrow(fivegrams) > 0) {
+                observedFivegramTails <- fivegrams[, tail]
+                # Update observedSixgramTails
+                observedSixgramTails <- c(observedSixgramTails, observedFivegramTails)
+        }
         
         # Get the quadgram count
         denom <- ngrams[ngram == quadgramPre][tail == unigram]
@@ -468,10 +462,11 @@ myPrediction <- function(tkns, ngrams) {
         quadgrams <- ngrams[ngram == trigram][!(tail %in% observedSixgramTails)]
         
         # Note the observed quadgram tail words
-        observedQuadgramTails <- quadgrams[, tail]$tail
-        
-        # Update observedSixgramTails
-        observedSixgramTails <- c(observedSixgramTails, observedQuadgramTails)
+        if(nrow(quadgrams) > 0) {
+                observedQuadgramTails <- quadgrams[, tail]
+                # Update observedSixgramTails
+                observedSixgramTails <- c(observedSixgramTails, observedQuadgramTails)
+        }
         
         # Get the trigram count
         denom <- ngrams[ngram == trigramPre][tail == unigram]
@@ -488,10 +483,11 @@ myPrediction <- function(tkns, ngrams) {
         trigrams <- ngrams[ngram == bigram][!(tail %in% observedSixgramTails)]
         
         # Note the observed trigram tail words
-        observedTrigramTails <- trigrams[, tail]$tail
-        
-        # Update observedSixgramTails
-        observedSixgramTails <- c(observedSixgramTails, observedTrigramTails)
+        if(nrow(trigrams) > 0) {
+                observedTrigramTails <- trigrams[, tail]
+                # Update observedSixgramTails
+                observedSixgramTails <- c(observedSixgramTails, observedTrigramTails)
+        }
         
         # Get the bigram count
         denom <- ngrams[ngram == bigramPre][tail == unigram]
@@ -508,13 +504,14 @@ myPrediction <- function(tkns, ngrams) {
         bigrams <- ngrams[ngram == unigram][!(tail %in% observedSixgramTails)]
         
         # Note the observed bigram tail words
-        observedBigramTails <- bigrams[, tail]$tail
-        
-        # Update observedSixgramTails
-        observedSixgramTails <- c(observedSixgramTails, observedBigramTails)
+        if(nrow(bigrams) > 0) {
+                observedBigramTails <- bigrams[, tail]
+                # Update observedSixgramTails
+                observedSixgramTails <- c(observedSixgramTails, observedBigramTails)
+        }
         
         # Get the unigram count
-        denom <- ngrams[ngram == unigram]
+        denom <- ngrams[ngram == unigram][n == 1]
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
