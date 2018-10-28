@@ -162,8 +162,6 @@ unigrams <- tokens_ngrams(myTokens, n = 1L)
 dfmUnigrams <- dfm(unigrams)
 unigramsDT <- data.table(ngram = featnames(dfmUnigrams), count = colSums(dfmUnigrams), 
                          stringsAsFactors = FALSE)
-tailWords <- unigramsDT$ngram
-unigramsDT <- unigramsDT[, tail := tailWords]
 
 saveRDS(unigramsDT, file = "./data/unigramsDT.rds")
 remove(unigrams)
@@ -178,8 +176,6 @@ bigrams <- tokens_ngrams(myTokens, n = 2L, concatenator = "_")
 dfmBigrams <- dfm(bigrams)
 bigramsDT <- data.table(ngram = featnames(dfmBigrams), count = colSums(dfmBigrams),
                         stringsAsFactors = FALSE)
-tailWords <- sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 2)
-bigramsDT <- bigramsDT[, tail := tailWords]
 
 # Save to file
 saveRDS(bigramsDT, file = "./data/bigramsDT.rds")
@@ -195,11 +191,6 @@ trigrams <- tokens_ngrams(myTokens, n = 3L, concatenator = "_")
 dfmTrigrams <- dfm(trigrams)
 trigramsDT <- data.table(ngram = featnames(dfmTrigrams), count = colSums(dfmTrigrams),
                         stringsAsFactors = FALSE)
-tailWords <- sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 3)
-trigramsDT <- trigramsDT[, tail := tailWords]
-
-# Remove tail word from ngram
-# trigramsDT <- trigramsDT[, ngram := paste(sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 2), sep = "_")]
 
 # Save file
 saveRDS(trigramsDT, file = "./data/trigramsDT.rds")
@@ -217,9 +208,6 @@ quadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQu
                          stringsAsFactors = FALSE)
 tailWords <- sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
 quadgramsDT <- quadgramsDT[, tail := tailWords]
-
-# Remove tail word from each quadgram
-# quadgramsDT <- quadgramsDT[, ngram := paste(sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sep = "_")]
 
 # Save to file
 saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
@@ -273,9 +261,6 @@ fivegramsDT <- fivegramsDT[20000001:30000000, tail := tailWords]
 tailWords <- sapply(strsplit(fivegramsDT$ngram[30000001:46871267], "_", fixed = TRUE), '[[', 5)
 fivegramsDT <- fivegramsDT[30000001:46871267, tail := tailWords]
 
-# Remove tail word from each fivegram
-# fivegramsDT <- fivegramsDT[, ngram := paste(sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4), sep = "_")]
-
 saveRDS(fivegramsDT, file = "./data/fivegramsDT.rds")
 remove(fivegramsDT)
 
@@ -324,10 +309,6 @@ tailWords <- sapply(strsplit(sixgramsDT$ngram[30000001:45227515], "_", fixed = T
 sixgramsDT <- sixgramsDT[30000001:45227515, tail := tailWords]
 
 remove(tailWords)
-
-# Remove tail word from each sixgram
-# sixgramsDT <- sixgramsDT[, ngram := paste(sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 5), sep = "_")]
-
 saveRDS(sixgramsDT, file = "./data/sixgramsDT.rds")
 remove(sixgramsDT)
 
@@ -341,30 +322,52 @@ gc()
 # Open files and remove ngrams with counts of 1 or less
 unigramsDT <- readRDS("./data/unigramsDT.rds")
 unigramsDT <- unigramsDT[count > 1, ]
+tailWords <- unigramsDT$ngram
+unigramsDT <- unigramsDT[, tail := tailWords]
 
 bigramsDT <- readRDS("./data/bigramsDT.rds")
 bigramsDT <- bigramsDT[count > 1, ]
+tailWords <- sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 2)
+bigramsDT <- bigramsDT[, tail := tailWords]
+bigramsDT <- bigramsDT[, ngram := sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 1)]
 
 trigramsDT <- readRDS("./data/trigramsDT.rds")
 trigramsDT <- trigramsDT[count > 1, ]
+tailWords <- sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 3)
+trigramsDT <- trigramsDT[, tail := tailWords]
+trigramsDT <- trigramsDT[, ngram := paste(sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(trigramsDT$ngram, "_", fixed = TRUE), '[[', 2), sep = "_")]
 
 quadgramsDT <- readRDS("./data/quadgramsDT.rds")
 quadgramsDT <- quadgramsDT[count > 1, ]
+tailWords <- sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
+quadgramsDT <- quadgramsDT[, tail := tailWords]
+quadgramsDT <- quadgramsDT[, ngram := paste(sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sep = "_")]
 
 fivegramsDT <- readRDS("./data/fivegramsDT.rds")
 fivegramsDT <- fivegramsDT[count > 1, ]
+tailWords <- sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 5)
+fivegramsDT <- fivegramsDT[, tail := tailWords]
+fivegramsDT <- fivegramsDT[, ngram := paste(sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(fivegramsDT$ngram, "_", fixed = TRUE), '[[', 4), sep = "_")]
 
 sixgramsDT <- readRDS("./data/sixgramsDT.rds")
 sixgramsDT <- sixgramsDT[count > 1, ]
-
+tailWords <- sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 6)
+sixgramsDT <- sixgramsDT[, tail := tailWords]
+sixgramsDT <- sixgramsDT[, ngram := paste(sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 1), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 2), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 3), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 4), sapply(strsplit(sixgramsDT$ngram, "_", fixed = TRUE), '[[', 5), sep = "_")]
 
 # Combine into a single data table ------------------------------------------------------
 
 # Remove tail word from the ngram
 
 # Remove tail word from bigrams
-bigramsDT <- bigramsDT[, ngram := sapply(strsplit(bigramsDT$ngram, "_", fixed = TRUE), '[[', 1)]
 
+# Remove tail word from ngram
+
+# Remove tail word from each quadgram
+
+# Remove tail word from each fivegram
+
+# Remove tail word from each sixgram
 
 # Combine ngrams
 ngramsDT <- rbind(unigramsDT, bigramsDT, trigramsDT, quadgramsDT, fivegramsDT, sixgramsDT)
@@ -406,28 +409,27 @@ inputText <- tolower(inputText)
 # Prediction function
 myPrediction <- function(tkns, ngrams) {
         
-        # Create denominator search terms
+        # Create ngram search terms
         unigram <- tkns[5]
         bigram <- paste(tkns[4], tkns[5], sep = "_")
         trigram <- paste(tkns[3], tkns[4], tkns[5], sep = "_")
         quadgram <- paste(tkns[2], tkns[3], tkns[4], tkns[5], sep = "_") 
         fivegram <- paste(tkns[1], tkns[2], tkns[3], tkns[4], tkns[5], sep = "_")
         
-        # Create numerator search terms
-        unigramPrefix <- paste("^", unigram, "_", sep = "")
-        bigramPrefix <- paste("^", bigram, "_", sep = "")
-        trigramPrefix <- paste("^", trigram, "_", sep = "")
-        quadgramPrefix <- paste("^", quadgram, "_", sep = "")
-        fivegramPrefix <- paste("^", fivegram, "_", sep = "")
+        # Create denominator search terms
+        fivegramPre <- paste(tkns[1], tkns[2], tkns[3], tkns[4], sep = "_")
+        quadgramPre <- paste(tkns[2], tkns[3], tkns[4], sep = "_") 
+        trigramPre <- paste(tkns[3], tkns[4], sep = "_")
+        bigramPre <- paste(tkns[4], sep = "_")
         
         # Find sixgrams
         sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        sixgrams <- ngrams[n == 6 & ngram %like% fivegramPrefix]
+        sixgrams <- ngrams[ngram == fivegram]
         
         # Get the fivegram count
-        denom <- ngrams[.(5,fivegram)]
+        denom <- ngrams[ngram == fivegramPre][tail == unigram]
      
         # Calculate probabilities
         if(nrow(denom) > 0) {
@@ -436,23 +438,23 @@ myPrediction <- function(tkns, ngrams) {
         
         # Find unobserved sixgrams
         # First get the tail words of unobserved sixgrams
-        observedSixgramTails <- sixgrams[, tail]
-        unobservedSixgramTails <- ngrams[n == 1 & !(tail %in% observedSixgramTails)]
+        observedSixgramTails <- sixgrams[, tail]$tail
+        unobservedSixgramTails <- ngrams[n == 1][!(tail %in% observedSixgramTails)]$tail
         
         # Back off to fivegrams
         fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        fivegrams <- ngrams[.(5, quadgramPrefix)]
-        
-        # Exclude fivegrams which end in the tail word of sixgrams found
-        fivegrams <- fivegrams[!(tail %in% observedSixgramTails)]
+        fivegrams <- ngrams[ngram == quadgram][!(tail %in% observedSixgramTails)]
         
         # Note observed fivegram tail words
-        observedFivegramTails <- fivegrams[, tail]
+        observedFivegramTails <- fivegrams[, tail]$tail
+        
+        # Update observedSixgramTails
+        observedSixgramTails <- c(observedSixgramTails, observedFivegramTails)
         
         # Get the quadgram count
-        denom <- ngrams[ngram == quadgram]
+        denom <- ngrams[ngram == quadgramPre][tail == unigram]
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
@@ -463,16 +465,16 @@ myPrediction <- function(tkns, ngrams) {
         quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        quadgrams <- ngrams[n == 4][ngram %like% trigramPrefix]
-        
-        # Exclude quadgrams with tail words already observed
-        quadgrams <- quadgrams[!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)]
+        quadgrams <- ngrams[ngram == trigram][!(tail %in% observedSixgramTails)]
         
         # Note the observed quadgram tail words
-        observedQuadgramTails <- quadgrams[, tail]
+        observedQuadgramTails <- quadgrams[, tail]$tail
+        
+        # Update observedSixgramTails
+        observedSixgramTails <- c(observedSixgramTails, observedQuadgramTails)
         
         # Get the trigram count
-        denom <- ngrams[ngram == trigram]
+        denom <- ngrams[ngram == trigramPre][tail == unigram]
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
@@ -483,16 +485,16 @@ myPrediction <- function(tkns, ngrams) {
         trigrams <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        trigrams <- ngrams[ngram %like% bigramPrefix]
-        
-        # Exclude trigrams with tail words already observed
-        trigrams <- trigrams[!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)][!(tail %in% observedQuadgramTails)]
+        trigrams <- ngrams[ngram == bigram][!(tail %in% observedSixgramTails)]
         
         # Note the observed trigram tail words
-        observedTrigramTails <- trigrams[, tail]
+        observedTrigramTails <- trigrams[, tail]$tail
+        
+        # Update observedSixgramTails
+        observedSixgramTails <- c(observedSixgramTails, observedTrigramTails)
         
         # Get the bigram count
-        denom <- ngrams[ngram == bigram]
+        denom <- ngrams[ngram == bigramPre][tail == unigram]
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
@@ -503,13 +505,13 @@ myPrediction <- function(tkns, ngrams) {
         bigrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        bigrams <- ngrams[ngram %like% unigramPrefix]
-        
-        # Exclude bigrams with tail words already observed
-        bigrams <- bigrams[!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)][!(tail %in% observedQuadgramTails)][!(tail %in% observedTrigramTails)]
+        bigrams <- ngrams[ngram == unigram][!(tail %in% observedSixgramTails)]
         
         # Note the observed bigram tail words
-        observedBigramTails <- bigrams[, tail]
+        observedBigramTails <- bigrams[, tail]$tail
+        
+        # Update observedSixgramTails
+        observedSixgramTails <- c(observedSixgramTails, observedBigramTails)
         
         # Get the unigram count
         denom <- ngrams[ngram == unigram]
@@ -525,7 +527,7 @@ myPrediction <- function(tkns, ngrams) {
                               tail = vector(mode = "character", length = 0))
         
         # Get unigrams which were not observed as tail words for any observed ngram
-        unigrams <- ngrams[n == 1][!(tail %in% observedSixgramTails)][!(tail %in% observedFivegramTails)][!(tail %in% observedQuadgramTails)][!(tail %in% observedTrigramTails)][!(tail %in% observedBigramTails)]
+        unigrams <- ngrams[n == 1][!(tail %in% observedSixgramTails)]
         
         # Get the total unigram count
         denom <- ngrams[n == 1][, sum(count)]
