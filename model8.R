@@ -1,14 +1,13 @@
 # Model Build 8
 # The strategy is to load each source (twitter, news, blogs) separately and then combine.
 
-library(dplyr)
-library(tidytext)
 library(data.table)
 library(quanteda)
-library(sqldf)
-library(hunspell)
-library(tm)
+library(textcat)
 library(readr)
+library(stringi)
+library(stringr)
+
 
 # Get a list of profanities to remove --------------------------------------------------------
 
@@ -47,20 +46,20 @@ sampleFile <- function(infile, outfile, header = TRUE) {
         ci <- file(infile, "r")
         co <- file(outfile, "w")
         if (header) {
-                hdr <- readLines(ci, n = 1)
+                hdr <- readLines(ci, n = 1, encoding = "UTF-8", skipNul=TRUE)
                 writeLines(hdr, co)
         }
         recnum = 0
         numout = 0
         while (TRUE) {
-                inrec <- readLines(ci, n = 1)
+                inrec <- readLines(ci, n = 1, encoding = "UTF-8", skipNul=TRUE)
                 if (length(inrec) == 0) { # end of file?
                         close(co)
                         close(ci)
                         return(numout)
                 }
                 recnum <- recnum + 1
-                if (rbinom(1, 1, prob = 1) == 1) {
+                if (rbinom(1, 1, prob = .1) == 1) {
                         numout <- numout + 1
                         writeLines(inrec, co)
                 }
@@ -71,35 +70,66 @@ sampleFile <- function(infile, outfile, header = TRUE) {
 t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
 sampleFile(t, "twitter.txt", header = FALSE)
 
-twitter <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
+unclean_tweet <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
 
 # Extract news sample
 n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
 sampleFile(n, "news.txt", header = FALSE)
 
-news <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
+news <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
 
 # Extract blogs sample
 b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
 sampleFile(b, "blogs.txt", header = FALSE)
 
-blogs <- read_file("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
+blogs <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
 
 
-# Clean text -----------------------------------------------------------------------------
+# Clean twitter text --------------------------------------------------------------------
 
-# Remove non-ASCII characters
-twitter <- stringi::stri_trans_general(twitter, "latin-ascii")
-news <- stringi::stri_trans_general(news, "latin-ascii")
-blogs <- stringi::stri_trans_general(blogs, "latin-ascii")
+# Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
+stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
+stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
+
+# Clean tweets
+clean_tweet <- str_replace_all(unclean_tweet, stuff_to_remove, "")
+
+# Remove leading and trailing spaces
+clean_tweet <- str_trim(clean_tweet)
+
+#clean_tweet = gsub("&amp", "", unclean_tweet)
+#clean_tweet = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_tweet)
+#clean_tweet = gsub("@\\w+", "", clean_tweet)
+#clean_tweet = gsub("[[:punct:]]", "", clean_tweet)
+#clean_tweet = gsub("[[:digit:]]", "", clean_tweet)
+#clean_tweet = gsub("http\\w+", "", clean_tweet)
+#clean_tweet = gsub("[ \t]{2,}", "", clean_tweet)
+#clean_tweet = gsub("^\\s+|\\s+$", "", clean_tweet) 
+
+# get rid of unnecessary spaces
+#clean_tweet <- str_replace_all(clean_tweet," "," ")
+# Get rid of URLs
+#clean_tweet <- str_replace_all(clean_tweet, "http://t.co/[a-z,A-Z,0-9]*{8}","")
+# Take out retweet header, there is only one
+#clean_tweet <- str_replace(clean_tweet,"RT @[a-z,A-Z]*: ","")
+# Get rid of hashtags
+#clean_tweet <- str_replace_all(clean_tweet,"#[a-z,A-Z]*","")
+# Get rid of references to other screennames
+#clean_tweet <- str_replace_all(clean_tweet,"@[a-z,A-Z]*","")   
+
+# Determine the language of the 
+# tweets.dt[,lang:=textcat(text, ECIMCI_profiles)]
+
+# Retain only English tweets
+# tweets <- unique(tweets.dt[lang == "en"]$text)
 
 
 # Create corpus --------------------------------------------------------------------------
 
 # Build 3 corpii and reshape to sentences
-twitterCorpus <- quanteda::corpus(twitter)
+twitterCorpus <- quanteda::corpus(clean_tweet)
 twitterCorpus <- corpus_reshape(twitterCorpus, to = "sentences")
-remove(twitter)
+remove(clean_tweet)
 gc()
 
 newsCorpus <- quanteda::corpus(news)
@@ -167,7 +197,6 @@ saveRDS(unigramsDT, file = "./data/unigramsDT.rds")
 remove(unigrams)
 remove(dfmUnigrams)
 remove(unigramsDT)
-remove(tailWords)
 
 gc()
 
@@ -182,7 +211,6 @@ saveRDS(bigramsDT, file = "./data/bigramsDT.rds")
 remove(bigrams)
 remove(dfmBigrams)
 remove(bigramsDT)
-remove(tailWords)
 
 gc()
 
@@ -197,7 +225,6 @@ saveRDS(trigramsDT, file = "./data/trigramsDT.rds")
 remove(trigrams)
 remove(dfmTrigrams)
 remove(trigramsDT)
-remove(tailWords)
 
 gc()
 
@@ -206,22 +233,20 @@ quadgrams <- tokens_ngrams(myTokens, n = 4L, concatenator = "_")
 dfmQuadgrams <- dfm(quadgrams)
 quadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQuadgrams),
                          stringsAsFactors = FALSE)
-tailWords <- sapply(strsplit(quadgramsDT$ngram, "_", fixed = TRUE), '[[', 4)
-quadgramsDT <- quadgramsDT[, tail := tailWords]
 
 # Save to file
 saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
 remove(quadgrams)
 remove(dfmQuadgrams)
 remove(quadgramsDT)
-remove(tailWords)
 
 gc()
 
 # Extract 5-grams, create a document feature matrix, save in a data table and extract tail word
 # First divide tokens to process
-myTokens1 <- myTokens[1:2409649]
-myTokens2 <- myTokens[2409650:4835363]
+h <- round(length(myTokens) / 2, 0)
+myTokens1 <- myTokens[1:h]
+myTokens2 <- myTokens[(h+1):length(myTokens)]
 remove(myTokens)
 
 fivegrams1 <- tokens_ngrams(myTokens1, n = 5L, concatenator = "_")
@@ -251,15 +276,6 @@ fivegramsDT[is.na(count.y)]$count.y <- 0
 fivegramsDT <- fivegramsDT[, count := count.x + count.y]
 fivegramsDT <- fivegramsDT[, count.x := NULL]
 fivegramsDT <- fivegramsDT[, count.y := NULL]
-
-tailWords <- sapply(strsplit(fivegramsDT$ngram[1:10000000], "_", fixed = TRUE), '[[', 5)
-fivegramsDT <- fivegramsDT[1:10000000, tail := tailWords]
-tailWords <- sapply(strsplit(fivegramsDT$ngram[10000001:20000000], "_", fixed = TRUE), '[[', 5)
-fivegramsDT <- fivegramsDT[10000001:20000000, tail := tailWords]
-tailWords <- sapply(strsplit(fivegramsDT$ngram[20000001:30000000], "_", fixed = TRUE), '[[', 5)
-fivegramsDT <- fivegramsDT[20000001:30000000, tail := tailWords]
-tailWords <- sapply(strsplit(fivegramsDT$ngram[30000001:46871267], "_", fixed = TRUE), '[[', 5)
-fivegramsDT <- fivegramsDT[30000001:46871267, tail := tailWords]
 
 saveRDS(fivegramsDT, file = "./data/fivegramsDT.rds")
 remove(fivegramsDT)
@@ -299,16 +315,6 @@ sixgramsDT <- sixgramsDT[, count := count.x + count.y]
 sixgramsDT <- sixgramsDT[, count.x := NULL]
 sixgramsDT <- sixgramsDT[, count.y := NULL]
 
-tailWords <- sapply(strsplit(sixgramsDT$ngram[1:10000000], "_", fixed = TRUE), '[[', 6)
-sixgramsDT <- sixgramsDT[1:10000000, tail := tailWords]
-tailWords <- sapply(strsplit(sixgramsDT$ngram[10000001:20000000], "_", fixed = TRUE), '[[', 6)
-sixgramsDT <- sixgramsDT[10000001:20000000, tail := tailWords]
-tailWords <- sapply(strsplit(sixgramsDT$ngram[20000001:30000000], "_", fixed = TRUE), '[[', 6)
-sixgramsDT <- sixgramsDT[20000001:30000000, tail := tailWords]
-tailWords <- sapply(strsplit(sixgramsDT$ngram[30000001:45227515], "_", fixed = TRUE), '[[', 6)
-sixgramsDT <- sixgramsDT[30000001:45227515, tail := tailWords]
-
-remove(tailWords)
 saveRDS(sixgramsDT, file = "./data/sixgramsDT.rds")
 remove(sixgramsDT)
 
@@ -371,31 +377,32 @@ remove(trigramsDT)
 remove(quadgramsDT)
 remove(fivegramsDT)
 remove(sixgramsDT)
+remove(tailWords)
 
 gc()
-
-# Index on ngram column
-setkey(ngramsDT, n, ngram)
 
 # Save
 saveRDS(ngramsDT, file = "./data/ngramsDT.rds")
 
-
 ############################ Remove ngrams with words not in dictionary ???
+
+
+# Setup data ---------------------------------------------------------------------------
+
+ngramsDT <- readRDS("./data/ngramsDT.rds")
+setkey(ngramsDT, ngram)
 
 
 # Stupid Backoff Prediction Algorithm --------------------------------------------------
 
-# Extract last 5 words from input text
-input <- "seen, then you must be"
-inputTokens <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
-              remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
-inputText <- inputTokens$text1[(length(inputTokens$text1)-4):length(inputTokens$text1)]
-inputText <- tolower(inputText)
-#inputString <- paste(inputText[1], inputText[2], inputText[3], inputText[4], inputText[5], sep = "_")
-
 # Prediction function
-myPrediction <- function(tkns, ngrams) {
+myPrediction <- function(input, ngrams) {
+        
+        # Extract last 5 words from input text
+        input <- tokens(input, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
+                              remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
+        tkns <- input$text1[(length(input$text1)-4):length(input$text1)]
+        tkns <- tolower(tkns)
         
         # Create ngram search terms
         unigram <- tkns[5]
