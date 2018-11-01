@@ -46,20 +46,20 @@ sampleFile <- function(infile, outfile, header = TRUE) {
         ci <- file(infile, "r")
         co <- file(outfile, "w")
         if (header) {
-                hdr <- readLines(ci, n = 1, encoding = "UTF-8", skipNul=TRUE)
+                hdr <- read_lines(ci, n_max = 1)
                 writeLines(hdr, co)
         }
         recnum = 0
         numout = 0
         while (TRUE) {
-                inrec <- readLines(ci, n = 1, encoding = "UTF-8", skipNul=TRUE)
+                inrec <- read_lines(ci)
                 if (length(inrec) == 0) { # end of file?
                         close(co)
                         close(ci)
                         return(numout)
                 }
                 recnum <- recnum + 1
-                if (rbinom(1, 1, prob = .1) == 1) {
+                if (rbinom(1, 1, prob = 1) == 1) {
                         numout <- numout + 1
                         writeLines(inrec, co)
                 }
@@ -70,19 +70,19 @@ sampleFile <- function(infile, outfile, header = TRUE) {
 t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
 sampleFile(t, "twitter.txt", header = FALSE)
 
-unclean_tweet <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
+unclean_tweet <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
 
 # Extract news sample
 n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
 sampleFile(n, "news.txt", header = FALSE)
 
-news <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
+news <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
 
 # Extract blogs sample
 b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
 sampleFile(b, "blogs.txt", header = FALSE)
 
-blogs <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
+blogs <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
 
 
 # Clean twitter text --------------------------------------------------------------------
@@ -91,11 +91,23 @@ blogs <- readLines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/caps
 stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
 stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
 
+# Replace all numbers ???
+# gsub("[^[:alnum:]]", " ",x) where x is the data
+
 # Clean tweets
 clean_tweet <- str_replace_all(unclean_tweet, stuff_to_remove, "")
+remove(unclean_tweet)
 
 # Remove leading and trailing spaces
 clean_tweet <- str_trim(clean_tweet)
+
+
+# Replace contractions using replace_contraction !!!!!!!!!!!!!!!!!!!!
+
+
+# Clean blogs
+# US_blogs_clean<-gsub("[^[:graph:]]","",US_blogs)
+
 
 #clean_tweet = gsub("&amp", "", unclean_tweet)
 #clean_tweet = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_tweet)
