@@ -74,7 +74,7 @@ unclean_tweet <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Pro
 # Extract news sample
 #n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
 #sampleFile(n, "news.txt", header = FALSE)
-news <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt")
+unclean_news <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt")
 
 # Extract blogs sample
 #b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
@@ -82,21 +82,38 @@ news <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/caps
 unclean_blog <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt")
 
 
-# Clean twitter text --------------------------------------------------------------------
+# Clean text --------------------------------------------------------------------
 
-# Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
-stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
-stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
+cleanText <- function(x) {
+        
+        # Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
+        stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "<.*>", "'s")
+        stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
+        
+        # Create regex to keep letters, numbers and punctuation
+        stuff_to_keep <- "[^ a-zA-Z0-9\\.?!;,']"
+        
+        # Create regex to remove extra spaces
+        trailing_space <- "[ ]{2,}|[ ]+$"
+        
+        # Clean text
+        cleaned <- str_replace_all(x, stuff_to_remove, " ")
+        cleaned <- str_replace_all(cleaned, stuff_to_keep, " ")
+        cleaned <- str_replace_all(cleaned, trailing_space, " ")
+        
+        # Replace & with and
+        cleaned <- str_replace_all(cleaned, "\\&", "and")
 
-# Clean tweets
-clean_tweet <- str_replace_all(unclean_tweet, stuff_to_remove, "")
+        return(cleaned)
+        
+}
+
+clean_tweet <- cleanText(unclean_tweet)
+clean_news <- cleanText(unclean_news)
+clean_blog <- cleanText(unclean_blog)
+
 remove(unclean_tweet)
-
-# Remove leading and trailing spaces
-clean_tweet <- str_trim(clean_tweet)
-
-# Clean blogs
-clean_blog <- str_replace_all(unclean_blog, "[^[:graph:]]", "")
+remove(unclean_news)
 remove(unclean_blog)
 
 
