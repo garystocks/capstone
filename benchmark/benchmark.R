@@ -214,9 +214,18 @@ benchmark <- compiler::cmpfun(function(FUN, ..., sent.list, ext.output=T) {
 
 myPredictionFunction <- compiler::cmpfun(function(x){
 
+        # Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
+        stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
+        stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
+        
+        # Clean tweets
+        clean_x <- str_replace_all(x, stuff_to_remove, "")
+        
+        # Remove leading and trailing spaces
+        clean_x <- str_trim(clean_x)
+        
         # Extract last 5 words from input text
-        # tkns <- tolower(strsplit(input, " "))
-        tkns <- tokens(x, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
+        tkns <- tokens(clean_x, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
                               remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
         tkns <- tolower(tkns)
         n <- length(tkns)
@@ -257,106 +266,70 @@ myPredictionFunction <- compiler::cmpfun(function(x){
                                tail = vector(mode = "character", length = 0))
         sixgrams <- ngrams[ngram == fivegram]
         
-        # Get the fivegram count
-        denom <- ngrams[ngram == fivegramPre][tail == unigram]
+        observedTails <- ""
         
-        # Calculate probabilities
-        if(nrow(denom) > 0) {
-                sixgrams <- sixgrams[, prob := sixgrams$count / denom$count]
-        }
-        
-        # Find unobserved sixgrams
-        # First get the tail words of unobserved sixgrams
+        # Calculate the aggregate sixgram count and probabilities
         if(nrow(sixgrams) > 0) {
-                observedSixgramTails <- sixgrams[, tail]
-        } else {
-                observedSixgramTails <- as.character()
+                denom <- sixgrams[, .(sum(count))][1, 1]
+                sixgrams <- sixgrams[, prob := sixgrams$count / denom]
+                # Note observed tailwords
+                observedTails <- sixgrams$tail
         }
-        
-        unobservedSixgramTails <- ngrams[n == 1][!(tail %in% observedSixgramTails)]$tail
         
         # Back off to fivegrams
         fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        fivegrams <- ngrams[ngram == quadgram][!(tail %in% observedSixgramTails)]
+        fivegrams <- ngrams[ngram == quadgram][!(tail %in% observedTails)]
         
-        # Note observed fivegram tail words
+        # Calculate the aggregate fivegram count and probabilities
         if(nrow(fivegrams) > 0) {
-                observedFivegramTails <- fivegrams[, tail]
-                # Update observedSixgramTails
-                observedSixgramTails <- c(observedSixgramTails, observedFivegramTails)
-        }
-        
-        # Get the quadgram count
-        denom <- ngrams[ngram == quadgramPre][tail == unigram]
-        
-        # Calculate probabilities
-        if(nrow(denom) > 0) {
-                fivegrams <- fivegrams[, prob := (fivegrams$count / denom$count) * .4]
+                denom <- fivegrams[, .(sum(count))][1, 1]
+                fivegrams <- fivegrams[, prob := fivegrams$count / denom]
+                # Note observed fivegram tail words
+                observedTails <- c(observedTails, fivegrams$tail)
         }
         
         # Back off to quadgrams
         quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        quadgrams <- ngrams[ngram == trigram][!(tail %in% observedSixgramTails)]
+        quadgrams <- ngrams[ngram == trigram][!(tail %in% observedTails)]
         
-        # Note the observed quadgram tail words
+        # Calculate the aggregate quadgram count and probabilities
         if(nrow(quadgrams) > 0) {
-                observedQuadgramTails <- quadgrams[, tail]
-                # Update observedSixgramTails
-                observedSixgramTails <- c(observedSixgramTails, observedQuadgramTails)
-        }
-        
-        # Get the trigram count
-        denom <- ngrams[ngram == trigramPre][tail == unigram]
-        
-        # Calculate probabilities
-        if(nrow(denom) > 0) {
-                quadgrams <- quadgrams[, prob := (quadgrams$count / denom$count) * .4]
+                denom <- quadgrams[, .(sum(count))][1, 1]
+                quadgrams <- quadgrams[, prob := quadgrams$count / denom]
+                # Note observed quadgram tail words
+                observedTails <- c(observedTails, quadgrams$tail)
         }
         
         # Back off to trigrams
         trigrams <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        trigrams <- ngrams[ngram == bigram][!(tail %in% observedSixgramTails)]
+        trigrams <- ngrams[ngram == bigram][!(tail %in% observedTails)]
         
-        # Note the observed trigram tail words
+        # Calculate the aggregate trigram count and probabilities
         if(nrow(trigrams) > 0) {
-                observedTrigramTails <- trigrams[, tail]
-                # Update observedSixgramTails
-                observedSixgramTails <- c(observedSixgramTails, observedTrigramTails)
+                denom <- trigrams[, .(sum(count))][1, 1]
+                trigrams <- trigrams[, prob := trigrams$count / denom]
+                # Note observed trigram tail words
+                observedTails <- c(observedTails, trigrams$tail)
         }
-        
-        # Get the bigram count
-        denom <- ngrams[ngram == bigramPre][tail == unigram]
-        
-        # Calculate probabilities
-        if(nrow(denom) > 0) {
-                trigrams <- trigrams[, prob := (trigrams$count / denom$count) * .4]
-        }
-        
+
         # Back off to bigrams
         bigrams <- data.table(ngram = vector(mode = "character", length = 0),
                               count = vector(mode = "integer", length = 0),
                               tail = vector(mode = "character", length = 0))
-        bigrams <- ngrams[ngram == unigram][!(tail %in% observedSixgramTails)]
+        bigrams <- ngrams[ngram == unigram][!(tail %in% observedTails)]
         
-        # Note the observed bigram tail words
+        # Calculate the aggregate bigram count and probabilities
         if(nrow(bigrams) > 0) {
-                observedBigramTails <- bigrams[, tail]
-                # Update observedSixgramTails
-                observedSixgramTails <- c(observedSixgramTails, observedBigramTails)
-        }
-        
-        # Get the unigram count
-        denom <- ngrams[ngram == unigram][n == 1]
-        
-        # Calculate probabilities
-        if(nrow(denom) > 0) {
-                bigrams <- bigrams[, prob := (bigrams$count / denom$count) * .4]
+                denom <- bigrams[, .(sum(count))][1, 1]
+                bigrams <- bigrams[, prob := bigrams$count / denom]
+                # Note observed bigram tail words
+                observedTails <- c(observedTails, bigrams$tail)
         }
         
         # Back off to unigrams
@@ -365,14 +338,14 @@ myPredictionFunction <- compiler::cmpfun(function(x){
                                tail = vector(mode = "character", length = 0))
         
         # Get unigrams which were not observed as tail words for any observed ngram
-        unigrams <- ngrams[n == 1][!(tail %in% observedSixgramTails)]
+        unigrams <- ngrams[n == 1][!(tail %in% observedTails)]
         
         # Get the total unigram count
-        denom <- ngrams[n == 1][, sum(count)]
+        denom <- ngrams[n == 1][, .(sum(count))][1, 1]
         
         # Calculate MLEs
         if(denom > 0) {
-                unigrams <- unigrams[, prob := (unigrams$count / denom) * .4]
+                unigrams <- unigrams[, prob := (unigrams$count / denom) * .1]
         }
         
         # Put all the MLEs into a single table

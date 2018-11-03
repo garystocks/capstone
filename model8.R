@@ -67,22 +67,19 @@ sampleFile <- function(infile, outfile, header = TRUE) {
 }
 
 # Extract Twitter sample
-t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
-sampleFile(t, "twitter.txt", header = FALSE)
-
-unclean_tweet <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/twitter.txt")
+#t <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt"
+#sampleFile(t, "twitter.txt", header = FALSE)
+unclean_tweet <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.twitter.txt")
 
 # Extract news sample
-n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
-sampleFile(n, "news.txt", header = FALSE)
-
-news <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/news.txt")
+#n <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt"
+#sampleFile(n, "news.txt", header = FALSE)
+news <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.news.txt")
 
 # Extract blogs sample
-b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
-sampleFile(b, "blogs.txt", header = FALSE)
-
-blogs <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/blogs.txt")
+#b <- "D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt"
+#sampleFile(b, "blogs.txt", header = FALSE)
+unclean_blog <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/data/en_US/en_US.blogs.txt")
 
 
 # Clean twitter text --------------------------------------------------------------------
@@ -91,9 +88,6 @@ blogs <- read_lines("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/cap
 stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
 stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
 
-# Replace all numbers ???
-# gsub("[^[:alnum:]]", " ",x) where x is the data
-
 # Clean tweets
 clean_tweet <- str_replace_all(unclean_tweet, stuff_to_remove, "")
 remove(unclean_tweet)
@@ -101,39 +95,9 @@ remove(unclean_tweet)
 # Remove leading and trailing spaces
 clean_tweet <- str_trim(clean_tweet)
 
-
-# Replace contractions using replace_contraction !!!!!!!!!!!!!!!!!!!!
-
-
 # Clean blogs
-# US_blogs_clean<-gsub("[^[:graph:]]","",US_blogs)
-
-
-#clean_tweet = gsub("&amp", "", unclean_tweet)
-#clean_tweet = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_tweet)
-#clean_tweet = gsub("@\\w+", "", clean_tweet)
-#clean_tweet = gsub("[[:punct:]]", "", clean_tweet)
-#clean_tweet = gsub("[[:digit:]]", "", clean_tweet)
-#clean_tweet = gsub("http\\w+", "", clean_tweet)
-#clean_tweet = gsub("[ \t]{2,}", "", clean_tweet)
-#clean_tweet = gsub("^\\s+|\\s+$", "", clean_tweet) 
-
-# get rid of unnecessary spaces
-#clean_tweet <- str_replace_all(clean_tweet," "," ")
-# Get rid of URLs
-#clean_tweet <- str_replace_all(clean_tweet, "http://t.co/[a-z,A-Z,0-9]*{8}","")
-# Take out retweet header, there is only one
-#clean_tweet <- str_replace(clean_tweet,"RT @[a-z,A-Z]*: ","")
-# Get rid of hashtags
-#clean_tweet <- str_replace_all(clean_tweet,"#[a-z,A-Z]*","")
-# Get rid of references to other screennames
-#clean_tweet <- str_replace_all(clean_tweet,"@[a-z,A-Z]*","")   
-
-# Determine the language of the 
-# tweets.dt[,lang:=textcat(text, ECIMCI_profiles)]
-
-# Retain only English tweets
-# tweets <- unique(tweets.dt[lang == "en"]$text)
+clean_blog <- str_replace_all(unclean_blog, "[^[:graph:]]", "")
+remove(unclean_blog)
 
 
 # Create corpus --------------------------------------------------------------------------
@@ -149,9 +113,9 @@ newsCorpus <- corpus_reshape(newsCorpus, to = "sentences")
 remove(news)
 gc()
 
-blogsCorpus <- quanteda::corpus(blogs)
+blogsCorpus <- quanteda::corpus(clean_blog)
 blogsCorpus <- corpus_reshape(blogsCorpus, to = "sentences")
-remove(blogs)
+remove(clean_blog)
 gc()
 
 # Combine text vectors
