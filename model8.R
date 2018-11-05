@@ -122,28 +122,38 @@ remove(unclean_blog)
 # Build 3 corpii and reshape to sentences
 twitterCorpus <- quanteda::corpus(clean_tweet)
 twitterCorpus <- corpus_reshape(twitterCorpus, to = "sentences")
+saveRDS(twitterCorpus, file = "./data/twitterCorpus.rds")
 remove(clean_tweet)
 gc()
 
 newsCorpus <- quanteda::corpus(clean_news)
 newsCorpus <- corpus_reshape(newsCorpus, to = "sentences")
+saveRDS(newsCorpus, file = "./data/newsCorpus.rds")
 remove(clean_news)
 gc()
 
 blogsCorpus <- quanteda::corpus(clean_blog)
 blogsCorpus <- corpus_reshape(blogsCorpus, to = "sentences")
+saveRDS(blogsCorpus, file = "./data/blogsCorpus.rds")
 remove(clean_blog)
 gc()
 
 # Combine text vectors
 corpusList <- c(twitterCorpus, newsCorpus, blogsCorpus)
 
+# Create a separate corpus with news and blogs data for quadgrams, fivegrams and sigrams
+corpusListNB <- c(newsCorpus, blogsCorpus)
+
 # Create corpus
 myCorpus <- quanteda::corpus(corpusList)
 saveRDS(myCorpus, file = "./data/myCorpus.rds")
+myCorpusNB <- quanteda::corpus(corpusListNB)
+saveRDS(myCorpusNB, file = "./data/myCorpusNB.rds")
 remove(twitterCorpus)
 remove(newsCorpus)
 remove(blogsCorpus)
+remove(myCorpusNB)
+remove(corpusListNB)
 gc()
 
 
@@ -223,50 +233,99 @@ remove(trigramsDT)
 gc()
 
 # Extract quadgrams, create a document feature matrix, save in a data table and extract tail word
-quadgrams <- tokens_ngrams(myTokens, n = 4L, concatenator = "_")
-saveRDS(quadgrams, file = "./data/quadgrams.rds")
+# First create tokens from separate corpuses
+twitterCorpus <- readRDS("./data/twitterCorpus.rds")
+myTwitterTokens <- tokens(twitterCorpus, what = "word", remove_numbers = TRUE, remove_punct = TRUE, 
+                   remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE, 
+                   remove_url = TRUE)
+remove(twitterCorpus)
 
-dfmQuadgrams <- dfm(quadgrams)
-quadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQuadgrams),
+twitterQuadgrams <- tokens_ngrams(myTwitterTokens, n = 4L, concatenator = "_")
+dfmQuadgrams <- dfm(twitterQuadgrams)
+twitterQuadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQuadgrams),
                          stringsAsFactors = FALSE)
 
 # Save to file
-saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
-remove(quadgrams)
+saveRDS(twitterQuadgramsDT, file = "./data/twitterQuadgramsDT.rds")
+remove(twitterQuadgrams)
 remove(dfmQuadgrams)
+remove(twitterQuadgramsDT)
+
+gc()
+
+# Repeat for news and blogs corpus
+myCorpusNB <- readRDS("./data/myCorpusNB.rds")
+myTokensNB <- tokens(myCorpusNB, what = "word", remove_numbers = TRUE, remove_punct = TRUE, 
+                          remove_symbols = TRUE, remove_separators = TRUE, remove_twitter = TRUE, 
+                          remove_url = TRUE)
+remove(myCorpusNB)
+
+quadgramsNB <- tokens_ngrams(myTokensNB, n = 4L, concatenator = "_")
+dfmQuadgrams <- dfm(quadgramsNB)
+quadgramsNBDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQuadgrams),
+                                 stringsAsFactors = FALSE)
+
+# Save to file
+saveRDS(quadgramsNBDT, file = "./data/quadgramsNBDT.rds")
+remove(quadgramsNB)
+remove(dfmQuadgrams)
+remove(quadgramsNBDT)
+
+gc()
+
+# Combine quadgram data tables
+twitterQuadgramsDT <- readRDS("./data/twitterQuadgramsDT.rds")
+quadgramsNBDT <- readRDS("./data/quadgramsNBDT.rds")
+quadgramsDT <- merge(twitterQuadgramsDT, quadgramsNBDT, by = "ngram", all = TRUE)
+remove(twitterQuadgramsDT)
+remove(quadgramsNBDT)
+quadgramsDT[is.na(count.x)]$count.x <- 0
+quadgramsDT[is.na(count.y)]$count.y <- 0
+quadgramsDT <- quadgramsDT[, count := count.x + count.y]
+quadgramsDT <- quadgramsDT[, count.x := NULL]
+quadgramsDT <- quadgramsDT[, count.y := NULL]
+
+saveRDS(quadgramsDT, file = "./data/quadgramsDT.rds")
 remove(quadgramsDT)
 
 gc()
 
 # Extract 5-grams, create a document feature matrix, save in a data table and extract tail word
-# First divide tokens to process
-h <- round(length(myTokens) / 2, 0)
-myTokens1 <- myTokens[1:h]
-myTokens2 <- myTokens[(h+1):length(myTokens)]
-remove(myTokens)
+twitterFivegrams <- tokens_ngrams(myTwitterTokens, n = 5L, concatenator = "_")
+dfmFivegrams <- dfm(twitterFivegrams)
+twitterFivegramsDT <- data.table(ngram = featnames(dfmFivegrams), count = colSums(dfmFivegrams),
+                                 stringsAsFactors = FALSE)
 
-fivegrams1 <- tokens_ngrams(myTokens1, n = 5L, concatenator = "_")
-dfmFivegrams1 <- dfm(fivegrams1)
-remove(fivegrams1)
-fivegramsDT1 <- data.table(ngram = featnames(dfmFivegrams1), count = colSums(dfmFivegrams1),
-                           stringsAsFactors = FALSE)
-remove(dfmFivegrams1)
-
-gc() 
-
-fivegrams2 <- tokens_ngrams(myTokens2, n = 5L, concatenator = "_")
-dfmFivegrams2 <- dfm(fivegrams2)
-remove(fivegrams2)
-fivegramsDT2 <- data.table(ngram = featnames(dfmFivegrams2), count = colSums(dfmFivegrams2),
-                           stringsAsFactors = FALSE)
-remove(dfmFivegrams2)
+# Save to file
+saveRDS(twitterFivegramsDT, file = "./data/twitterFivegramsDT.rds")
+remove(twitterFivegrams)
+remove(dfmFivegrams)
+remove(twitterFivegramsDT)
 
 gc()
 
-# Merge data tables and combine counts
-fivegramsDT <- merge(fivegramsDT1, fivegramsDT2, by = "ngram", all = TRUE)
-remove(fivegramsDT1)
-remove(fivegramsDT2)
+# Repeat for news and blogs corpus
+fivegramsNB <- tokens_ngrams(myTokensNB, n = 5L, concatenator = "_")
+dfmFivegrams <- dfm(fivegramsNB)
+fivegramsNBDT <- data.table(ngram = featnames(dfmFivegrams), count = colSums(dfmFivegrams),
+                            stringsAsFactors = FALSE)
+
+# Save to file
+saveRDS(fivegramsNBDT, file = "./data/fivegramsNBDT.rds")
+remove(fivegramsNBDT)
+remove(dfmFivegrams)
+remove(fivegramsNB)
+
+gc()
+
+# Combine fivegrams into one table
+twitterFivegramsDT <- readRDS("./data/twitterFivegramsDT.rds")
+twitterFivegramsDT <- twitterFivegramsDT[count > 1, ]
+fivegramsNBDT <- readRDS("./data/fivegramsNBDT.rds")
+fivegramsNBDT <- fivegramsNBDT[count > 1, ]
+fivegramsDT <- merge(twitterFivegramsDT, fivegramsNBDT, by = "ngram", all = TRUE)
+remove(twitterFivegramsDT)
+remove(fivegramsNBDT)
 fivegramsDT[is.na(count.x)]$count.x <- 0
 fivegramsDT[is.na(count.y)]$count.y <- 0
 fivegramsDT <- fivegramsDT[, count := count.x + count.y]
@@ -278,33 +337,43 @@ remove(fivegramsDT)
 
 gc()
 
+
 # Extract 6-grams, create a document feature matrix, save in a data table and extract tail word
-sixgrams1 <- tokens_ngrams(myTokens1, n = 6L, concatenator = "_")
-dfmSixgrams1 <- dfm(sixgrams1)
-remove(sixgrams1)
-sixgramsDT1 <- data.table(ngram = featnames(dfmSixgrams1), count = colSums(dfmSixgrams1),
-                          stringsAsFactors = FALSE)
-remove(dfmSixgrams1)
+twitterSixgrams <- tokens_ngrams(myTwitterTokens, n = 6L, concatenator = "_")
+dfmSixgrams <- dfm(twitterSixgrams)
+twitterSixgramsDT <- data.table(ngram = featnames(dfmSixgrams), count = colSums(dfmSixgrams),
+                                 stringsAsFactors = FALSE)
 
-saveRDS(sixgramsDT1, file = "./data/sixgramsDT1.rds")
-remove(sixgramsDT1)
-
-gc()
-
-sixgrams2 <- tokens_ngrams(myTokens2, n = 6L, concatenator = "_")
-dfmSixgrams2 <- dfm(sixgrams2)
-remove(sixgrams2)
-sixgramsDT2 <- data.table(ngram = featnames(dfmSixgrams2), count = colSums(dfmSixgrams2),
-                          stringsAsFactors = FALSE)
-remove(dfmSixgrams2)
+# Save to file
+saveRDS(twitterSixgramsDT, file = "./data/twitterSixgramsDT.rds")
+remove(twitterSixgrams)
+remove(dfmSixgrams)
+remove(twitterSixgramsDT)
 
 gc()
 
-# Merge data tables and combine counts
-sixgramsDT1 <- readRDS("./data/sixgramsDT1.rds")
-sixgramsDT <- merge(sixgramsDT1, sixgramsDT2, by = "ngram", all = TRUE)
-remove(sixgramsDT1)
-remove(sixgramsDT2)
+# Repeat for news and blogs corpus
+sixgramsNB <- tokens_ngrams(myTokensNB, n = 6L, concatenator = "_")
+dfmSixgrams <- dfm(sixgramsNB)
+sixgramsNBDT <- data.table(ngram = featnames(dfmSixgrams), count = colSums(dfmSixgrams),
+                            stringsAsFactors = FALSE)
+
+# Save to file
+saveRDS(sixgramsNBDT, file = "./data/sixgramsNBDT.rds")
+remove(sixgramsNB)
+remove(dfmSixgrams)
+remove(sixgramsNBDT)
+
+gc()
+
+# Combine sixgrams into one table
+twitterSixgramsDT <- readRDS("./data/twitterSixgramsDT.rds")
+twitterSixgramsDT <- twitterSixgramsDT[count > 1, ]
+sixgramsNBDT <- readRDS("./data/sixgramsNBDT.rds")
+sixgramsNBDT <- sixgramsNBDT[count > 1, ]
+sixgramsDT <- merge(twitterSixgramsDT, sixgramsNBDT, by = "ngram", all = TRUE)
+remove(twitterSixgramsDT)
+remove(sixgramsNBDT)
 sixgramsDT[is.na(count.x)]$count.x <- 0
 sixgramsDT[is.na(count.y)]$count.y <- 0
 sixgramsDT <- sixgramsDT[, count := count.x + count.y]
@@ -314,8 +383,6 @@ sixgramsDT <- sixgramsDT[, count.y := NULL]
 saveRDS(sixgramsDT, file = "./data/sixgramsDT.rds")
 remove(sixgramsDT)
 
-remove(myTokens1)
-remove(myTokens2)
 gc()
 
 
