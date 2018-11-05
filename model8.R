@@ -125,9 +125,9 @@ twitterCorpus <- corpus_reshape(twitterCorpus, to = "sentences")
 remove(clean_tweet)
 gc()
 
-newsCorpus <- quanteda::corpus(news)
+newsCorpus <- quanteda::corpus(clean_news)
 newsCorpus <- corpus_reshape(newsCorpus, to = "sentences")
-remove(news)
+remove(clean_news)
 gc()
 
 blogsCorpus <- quanteda::corpus(clean_blog)
@@ -140,6 +140,7 @@ corpusList <- c(twitterCorpus, newsCorpus, blogsCorpus)
 
 # Create corpus
 myCorpus <- quanteda::corpus(corpusList)
+saveRDS(myCorpus, file = "./data/myCorpus.rds")
 remove(twitterCorpus)
 remove(newsCorpus)
 remove(blogsCorpus)
@@ -223,6 +224,8 @@ gc()
 
 # Extract quadgrams, create a document feature matrix, save in a data table and extract tail word
 quadgrams <- tokens_ngrams(myTokens, n = 4L, concatenator = "_")
+saveRDS(quadgrams, file = "./data/quadgrams.rds")
+
 dfmQuadgrams <- dfm(quadgrams)
 quadgramsDT <- data.table(ngram = featnames(dfmQuadgrams), count = colSums(dfmQuadgrams),
                          stringsAsFactors = FALSE)
