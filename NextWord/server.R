@@ -9,6 +9,7 @@
 
 library(shiny)
 library(quanteda)
+library(ggplot2)
 
 # Load data
 setwd("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone")
@@ -164,25 +165,22 @@ shinyServer(function(input, output) {
                 
                 # Predict next word
                 # paste(output[1:3, tail])
+
         })
         
         # Predict next word
         output$prediction <- renderText({
                 wordPrediction()[1:3, tail]
-                
+
         })
         
+        # Plot top words
         output$plot <- renderPlot({
                 
-                x <- wordPrediction()[, tail]
-                y <- wordPrediction()[, prob]
-                
-                plot(x, y,
-                     xlab = "Word Prediction",
-                     ylab = "Score")
+                ggplot(data = wordPrediction(), aes(tail, prob)) + labs(x = "Word", y = "Score") + geom_col(fill = "cornflowerblue") + coord_flip()
                 
         })
-        
+
 })
 
 
