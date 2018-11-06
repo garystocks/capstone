@@ -271,7 +271,7 @@ myPredictionFunction <- compiler::cmpfun(function(x){
         # Calculate the aggregate sixgram count and probabilities
         if(nrow(sixgrams) > 0) {
                 denom <- sixgrams[, .(sum(count))][1, 1]
-                sixgrams <- sixgrams[, prob := sixgrams$count / denom]
+                sixgrams <- sixgrams[, prob := (count / denom[[1]])]
                 # Note observed tailwords
                 observedTails <- sixgrams$tail
         }
@@ -285,7 +285,7 @@ myPredictionFunction <- compiler::cmpfun(function(x){
         # Calculate the aggregate fivegram count and probabilities
         if(nrow(fivegrams) > 0) {
                 denom <- fivegrams[, .(sum(count))][1, 1]
-                fivegrams <- fivegrams[, prob := fivegrams$count / denom]
+                fivegrams <- fivegrams[, prob := (count / denom[[1]] * .6)]
                 # Note observed fivegram tail words
                 observedTails <- c(observedTails, fivegrams$tail)
         }
@@ -299,7 +299,7 @@ myPredictionFunction <- compiler::cmpfun(function(x){
         # Calculate the aggregate quadgram count and probabilities
         if(nrow(quadgrams) > 0) {
                 denom <- quadgrams[, .(sum(count))][1, 1]
-                quadgrams <- quadgrams[, prob := quadgrams$count / denom]
+                quadgrams <- quadgrams[, prob := (count / denom[[1]] * .4)]
                 # Note observed quadgram tail words
                 observedTails <- c(observedTails, quadgrams$tail)
         }
@@ -313,7 +313,7 @@ myPredictionFunction <- compiler::cmpfun(function(x){
         # Calculate the aggregate trigram count and probabilities
         if(nrow(trigrams) > 0) {
                 denom <- trigrams[, .(sum(count))][1, 1]
-                trigrams <- trigrams[, prob := trigrams$count / denom]
+                trigrams <- trigrams[, prob := (count / denom[[1]] * .3)]
                 # Note observed trigram tail words
                 observedTails <- c(observedTails, trigrams$tail)
         }
@@ -322,12 +322,12 @@ myPredictionFunction <- compiler::cmpfun(function(x){
         bigrams <- data.table(ngram = vector(mode = "character", length = 0),
                               count = vector(mode = "integer", length = 0),
                               tail = vector(mode = "character", length = 0))
-        bigrams <- ngrams[ngram == unigram][!(tail %in% observedTails)]
+        bigrams <- ngrams[ngram == unigram][n == 2][!(tail %in% observedTails)]
         
         # Calculate the aggregate bigram count and probabilities
         if(nrow(bigrams) > 0) {
                 denom <- bigrams[, .(sum(count))][1, 1]
-                bigrams <- bigrams[, prob := bigrams$count / denom]
+                bigrams <- bigrams[, prob := (count / denom[[1]] * .2)]
                 # Note observed bigram tail words
                 observedTails <- c(observedTails, bigrams$tail)
         }
@@ -345,7 +345,7 @@ myPredictionFunction <- compiler::cmpfun(function(x){
         
         # Calculate MLEs
         if(denom > 0) {
-                unigrams <- unigrams[, prob := (unigrams$count / denom) * .1]
+                unigrams <- unigrams[, prob := (count / denom[[1]]) * .1]
         }
         
         # Put all the MLEs into a single table
@@ -368,6 +368,6 @@ myPredictionFunction <- compiler::cmpfun(function(x){
 ################################################################################################
 benchmark(myPredictionFunction,
           # additional parameters to be passed to the prediction function can be inserted here
-          sent.list = list('tweets' = head(tweets, 10), 
-                           'blogs' = head(blogs, 10)), 
+          sent.list = list('tweets' = tweets, 
+                           'blogs' = blogs), 
           ext.output = T)

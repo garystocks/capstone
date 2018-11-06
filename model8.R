@@ -385,6 +385,11 @@ remove(sixgramsDT)
 
 gc()
 
+remove(myTokensNB)
+remove(myTwitterTokens)
+
+gc()
+
 
 # Remove low frequency ngrams -----------------------------------------------------------
 
