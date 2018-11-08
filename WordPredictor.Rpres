@@ -9,17 +9,16 @@ autosize: true
 
 Overview
 ========================================================
-The objective of this model is to predict the next word from a sequence of words typed by a user. This can improve the usability of software applications which involve a lot of typing or smaller-sized interfaces where typing is difficult, such as those found on mobile devices.
-
-This presentation describes how the data was prepared and used to build an algorithm to predict the next word. The interactive Shiny app with the prediction model has been published [here](add Shiny app URL).
+The objective of this model is to predict the next word from a sequence of words typed by a user. This can improve the usability of software applications which involve a lot of typing or smaller-sized interfaces where typing is difficult, such as those found on mobile devices. This presentation describes the algorithm used to predict the next word.
 
 A set of text documents from twitter, news feeds and blogs was used to train the model. This data was provided by SwiftKey. An algorithm was built based on a Markov n-gram model with Stupid Back-off. A 6-gram model was settled on after testing various models.
 
 Next Word Prediction Algorithm
 ========================================================
-The user first enters a series of words and then selects the *submit* button to return the top 3 next word predictions, in order of likelihood.
+The training data was used to build a table of n-grams from 1 to 6, with the frequency count of each n-gram in the observed training data.
 
-The likelihood of each word is determined using a stupid backoff algorithm. This works by searching for 6-grams which start with the last 5 (if there are at least 5) words of the user's phrase and calculating a score. The score is determined by the observed frequency of each 6-gram and the total number of 6-grams observed. Then the last 4 words are used to find 5-grams which start with that word sequence. The score for each 5-gram is determined and weighted by 0.7. This process continues until arriving at unigrams.
+To predict the next word from a phrase, the phrase (starting with the last 5 words of the phrase, if there are at least 5 words in the phrase) is searched for in the table of n-grams. If found, the likelihood score is calculated based on the frequency count of the 6-gram found and the total frequency count of all 6-grams starting with that phrase. The model then backs off 5-grams to search for other possible next words by finding 5-grams that start with the last 4 words of the phrase, and so on until arriving at unigrams. The likelihood of next words from lower-order n-grams is weighted down by a discount factor. When arriving at 1-grams (unigrams), the likelihood of words not yet predicted is based on the frequency count of the unigram and the total frequency count of all unigrams not detected. The words with the 3 highest likelihood scores are returned.
+
 
 Prediction Algorithm Performance
 ========================================================
@@ -28,6 +27,15 @@ Summarise the performance of the prediction algorithm.
 How to Use the Shiny App
 ========================================================
 To use the app, navigate [here](add Shiny app URL) and enter a phrase in the text input box. Click *submit*. The app will return the top 3 most likely words to follow the phrase entered, in order from most likely to least likely.
+
+```{r, echo=FALSE, fig.height = 5, fig.width = 10, fig.align = "center"}
+library(imager)
+myimg <- load.image("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone/shinyapp.png")
+plot(myimg)
+```
+
+
+
 
 (Include an image of the app)
 
