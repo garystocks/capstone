@@ -10,6 +10,8 @@
 library(shiny)
 library(quanteda)
 library(ggplot2)
+library(data.table)
+library(stringr)
 
 # Load data
 setwd("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/capstone")
@@ -21,6 +23,9 @@ shinyServer(function(input, output) {
         
         # Function to predict next word
         wordPrediction <- reactive({
+                
+                # Set absoluate discount
+                disc <- 0.75
                 
                 # Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
                 stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
@@ -75,16 +80,22 @@ shinyServer(function(input, output) {
                 sixgrams <- ngrams[ngram == fivegram]
                 
                 observedTails <- ""
+                alphaSixgrams <- 1
                 
                 # Calculate the aggregate sixgram count and probabilities
                 if(nrow(sixgrams) > 0) {
                         denom <- sixgrams[, .(sum(count))][1, 1]
-                        sixgrams <- sixgrams[, prob := (count / denom[[1]])]
+                        sixgrams <- sixgrams[, prob := ((count - disc[[1]]) / denom[[1]])]
+                        # Calculate alpha for sixgrams
+                        #alphaSixgrams <- 1 - sixgrams[, .(sum(prob))][1, 1]
+                        alphaSixgrams <- (nrow(sixgrams) * disc[[1]]) / denom[[1]]
                         # Note observed tailwords
                         observedTails <- sixgrams$tail
                 }
                 
                 # Back off to fivegrams
+                alphaFivegrams <- 1
+                
                 fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
                                         count = vector(mode = "integer", length = 0),
                                         tail = vector(mode = "character", length = 0))
@@ -93,12 +104,17 @@ shinyServer(function(input, output) {
                 # Calculate the aggregate fivegram count and probabilities
                 if(nrow(fivegrams) > 0) {
                         denom <- fivegrams[, .(sum(count))][1, 1]
-                        fivegrams <- fivegrams[, prob := (count / denom[[1]] * .6)]
+                        fivegrams <- fivegrams[, prob := alphaSixgrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+                        # Calculate alpha for fivegrams
+                        #alphaFivegrams <- alphaSixgrams[[1]] - fivegrams[, .(sum(prob))][1, 1]
+                        alphaFivegrams <- (nrow(fivegrams) * alphaSixgrams[[1]] * disc[[1]]) / denom[[1]]
                         # Note observed fivegram tail words
                         observedTails <- c(observedTails, fivegrams$tail)
                 }
                 
                 # Back off to quadgrams
+                alphaQuadgrams <- 1
+                
                 quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
                                         count = vector(mode = "integer", length = 0),
                                         tail = vector(mode = "character", length = 0))
@@ -107,12 +123,17 @@ shinyServer(function(input, output) {
                 # Calculate the aggregate quadgram count and probabilities
                 if(nrow(quadgrams) > 0) {
                         denom <- quadgrams[, .(sum(count))][1, 1]
-                        quadgrams <- quadgrams[, prob := (count / denom[[1]] * .4)]
+                        quadgrams <- quadgrams[, prob := alphaFivegrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+                        # Calculate alpha for quadgrams
+                        #alphaQuadgrams <- alphaFivegrams[[1]] - quadgrams[, .(sum(prob))][1, 1]
+                        alphaQuadgrams <- (nrow(quadgrams) * alphaFivegrams[[1]] * disc[[1]]) / denom[[1]]
                         # Note observed quadgram tail words
                         observedTails <- c(observedTails, quadgrams$tail)
                 }
                 
                 # Back off to trigrams
+                alphaTrigrams <- 1
+                
                 trigrams <- data.table(ngram = vector(mode = "character", length = 0),
                                        count = vector(mode = "integer", length = 0),
                                        tail = vector(mode = "character", length = 0))
@@ -121,12 +142,17 @@ shinyServer(function(input, output) {
                 # Calculate the aggregate trigram count and probabilities
                 if(nrow(trigrams) > 0) {
                         denom <- trigrams[, .(sum(count))][1, 1]
-                        trigrams <- trigrams[, prob := (count / denom[[1]] * .3)]
+                        trigrams <- trigrams[, prob := alphaQuadgrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+                        # Calculate alpha for trigrams
+                        #alphaTrigrams <- alphaQuadgrams[[1]] - trigrams[, .(sum(prob))][1, 1]
+                        alphaTrigrams <- (nrow(trigrams) * alphaQuadgrams[[1]] * disc[[1]]) / denom[[1]]
                         # Note observed trigram tail words
                         observedTails <- c(observedTails, trigrams$tail)
                 }
                 
                 # Back off to bigrams
+                alphaBigrams <- 1
+                
                 bigrams <- data.table(ngram = vector(mode = "character", length = 0),
                                       count = vector(mode = "integer", length = 0),
                                       tail = vector(mode = "character", length = 0))
@@ -135,7 +161,10 @@ shinyServer(function(input, output) {
                 # Calculate the aggregate bigram count and probabilities
                 if(nrow(bigrams) > 0) {
                         denom <- bigrams[, .(sum(count))][1, 1]
-                        bigrams <- bigrams[, prob := (count / denom[[1]] * .2)]
+                        bigrams <- bigrams[, prob := alphaTrigrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+                        # Calculate alpha for bigrams
+                        #alphaBigrams <- alphaTrigrams[[1]] - bigrams[, .(sum(prob))][1, 1]
+                        alphaBigrams <- (nrow(bigrams) * alphaBigrams[[1]] * disc[[1]]) / denom[[1]]
                         # Note observed bigram tail words
                         observedTails <- c(observedTails, bigrams$tail)
                 }
@@ -153,15 +182,15 @@ shinyServer(function(input, output) {
                 
                 # Calculate MLEs
                 if(denom > 0) {
-                        unigrams <- unigrams[, prob := (count / denom[[1]]) * .1]
+                        unigrams <- unigrams[, prob := alphaBigrams[[1]] * (count / denom[[1]])]
                 }
                 
                 # Put all the MLEs into a single table
                 MLEs <- rbind(sixgrams, fivegrams, quadgrams, trigrams, bigrams, unigrams, fill = TRUE)
-                MLEs <- MLEs[order(-MLEs$prob), ]
+                topWords <- MLEs[order(-MLEs$prob), ]
                 
                 # Put top 3 predictions in a character string
-                output <- MLEs[1:10, ]
+                return(topWords[1:10, ])
                 
                 # Predict next word
                 # paste(output[1:3, tail])
@@ -170,16 +199,16 @@ shinyServer(function(input, output) {
         
         # Predict next word
         output$prediction <- renderText({
-                wordPrediction()[1:3, tail]
+                wordPrediction()[1:5, tail]
 
         })
         
         # Plot top words
-        output$plot <- renderPlot({
+        #output$plot <- renderPlot({
                 
-                ggplot(data = wordPrediction(), aes(tail, prob)) + labs(x = "Word", y = "Score") + geom_col(fill = "cornflowerblue") + coord_flip()
+        #        ggplot(data = wordPrediction(), aes(tail, prob)) + labs(x = "Word", y = "Score") + geom_col(fill = "cornflowerblue") + coord_flip()
                 
-        })
+        #})
 
 })
 

@@ -9,20 +9,33 @@ autosize: true
 
 Overview
 ========================================================
-The objective of this model is to predict the next word from a sequence of words typed by a user. This can improve the usability of software applications which involve a lot of typing or smaller-sized interfaces where typing is difficult, such as those found on mobile devices. This presentation describes the algorithm used to predict the next word.
+The objective of this model is to predict the next word from a sequence of words typed by a user. This can improve the usability of software applications which involve a lot of typing or smaller-sized interfaces where typing is difficult, such as those found on mobile devices.
 
-A set of text documents from twitter, news feeds and blogs was used to train the model. This data was provided by SwiftKey. An algorithm was built based on a Markov n-gram model with Stupid Back-off. A 6-gram model was settled on after testing various models.
+A set of text documents from twitter, news feeds and blogs was used to train the model. This data was provided by SwiftKey. A 6-gram probabilistic language model was built using Katz Backoff to rank next-word candidates.
+
+The model achieved a 23.05% top-3 precision using an independent benchmark.
+
 
 Next Word Prediction Algorithm
 ========================================================
 The training data was used to build a table of n-grams from 1 to 6, with the frequency count of each n-gram in the observed training data.
 
-To predict the next word from a phrase, the phrase (starting with the last 5 words of the phrase, if there are at least 5 words in the phrase) is searched for in the table of n-grams. If found, the likelihood score is calculated based on the frequency count of the 6-gram found and the total frequency count of all 6-grams starting with that phrase. The model then backs off 5-grams to search for other possible next words by finding 5-grams that start with the last 4 words of the phrase, and so on until arriving at unigrams. The likelihood of next words from lower-order n-grams is weighted down by a discount factor. When arriving at 1-grams (unigrams), the likelihood of words not yet predicted is based on the frequency count of the unigram and the total frequency count of all unigrams not detected. The words with the 3 highest likelihood scores are returned.
+To predict the next word from a phrase, the phrase (starting with the last 5 words of the phrase, if there are at least 5 words in the phrase) is searched for in the table of n-grams. If found, the probability is calculated based on the frequency count of the 6-gram found and the total frequency count of all 6-grams starting with that phrase. The model then backs off to 5-grams to search for other possible next words by finding 5-grams that start with the last 4 words of the phrase, and so on until arriving at unigrams. The likelihood of next words from lower-order n-grams is weighted down by a discount factor. When arriving at 1-grams (unigrams), the likelihood of words not yet predicted is based on the frequency count of the unigram and the total frequency count of all unigrams not detected. The words with the 5 highest likelihood scores are returned.
 
 
 Prediction Algorithm Performance
 ========================================================
-Summarise the performance of the prediction algorithm.
+To test the performance of the model, a [script](https://github.com/hfoffani/dsci-benchmark) was used. This script imports text from randomly selected tweets and blogs, and then evaluates the performance based on the top 3 predictions for each phrase.
+
+The results obtained were:
+* Overall top-3 score: 18.91%
+* Overall top-1 precision: 14.13%
+* Overall top-3 precision: 23.05%
+
+The average runtime was 236.06 msec.
+
+The 23% top-3 precision means that the model returns a correct prediction among its top 3 predictions in just over 1 out of every 5 predictions.
+
 
 How to Use the Shiny App
 ========================================================

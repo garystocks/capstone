@@ -548,7 +548,7 @@ myPrediction <- function(input, ngrams) {
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
-                quadgrams <- quadgrams[, prob := (quadgrams$count / denom$count) * .4]
+                quadgrams <- quadgrams[, prob := (quadgrams$count / denom$count) * .4 * .4]
         }
         
         # Back off to trigrams
@@ -569,7 +569,7 @@ myPrediction <- function(input, ngrams) {
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
-                trigrams <- trigrams[, prob := (trigrams$count / denom$count) * .4]
+                trigrams <- trigrams[, prob := (trigrams$count / denom$count) * .4 * .4 * .4]
         }
         
         # Back off to bigrams
@@ -590,7 +590,7 @@ myPrediction <- function(input, ngrams) {
         
         # Calculate probabilities
         if(nrow(denom) > 0) {
-                bigrams <- bigrams[, prob := (bigrams$count / denom$count) * .4]
+                bigrams <- bigrams[, prob := (bigrams$count / denom$count) * .4 * .4 * .4 * .4]
         }
         
         # Back off to unigrams
