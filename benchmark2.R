@@ -570,6 +570,6 @@ myPredictionFunction <- compiler::cmpfun(function(x){
 ################################################################################################
 benchmark(myPredictionFunction,
           # additional parameters to be passed to the prediction function can be inserted here
-          sent.list = list('tweets' = head(tweets, 10), 
-                           'blogs' = head(blogs, 10)), 
+          sent.list = list('tweets' = tweets, 
+                           'blogs' = blogs), 
           ext.output = T)
