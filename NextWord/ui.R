@@ -9,7 +9,6 @@
 
 library(shiny)
 
-# Define UI for application that draws a histogram
 shinyUI(fluidPage(
   
   # Application title
@@ -30,8 +29,8 @@ shinyUI(fluidPage(
             br(),
             
             # Think about creating a histogram of top 10 predicted words based on probabilities
-            h4("Top 10 Word Predictions and Scores")
-            #plotOutput(outputId = "plot")
+            h4("Top 10 Word Predictions and Scores"),
+            plotOutput(outputId = "plot")
     )
   )
 )

@@ -3,7 +3,7 @@ WordPredictor
 author: Gary Stocks
 font-import: http://fonts.googleapis.com/css?family=Risque
 font-family: 'Risque'
-date: 7 November 2018
+date: 14 November 2018
 transition: rotate
 autosize: true
 
@@ -11,35 +11,32 @@ Overview
 ========================================================
 The objective of this model is to predict the next word from a sequence of words typed by a user. This can improve the usability of software applications which involve a lot of typing or smaller-sized interfaces where typing is difficult, such as those found on mobile devices.
 
-A set of text documents from twitter, news feeds and blogs was used to train the model. This data was provided by SwiftKey. A 6-gram probabilistic language model was built using Katz Backoff to rank next-word candidates.
+A set of text documents from twitter, news feeds and blogs was used to train the model. This data was provided by SwiftKey. A 6-gram probabilistic language model was built using *Stupid Backoff* to rank next-word candidates.
 
-The model achieved a 23.05% top-3 precision using an independent benchmark.
+The model achieved a 23.03% top-3 precision using an independent benchmark.
 
 
 Next Word Prediction Algorithm
 ========================================================
-The training data was used to build a table of n-grams from 1 to 6, with the frequency count of each n-gram in the observed training data.
+The training data was used to build a table of n-grams from 1 to 6, with the frequency count of each n-gram from the observed training data.
 
-To predict the next word from a phrase, the phrase (starting with the last 5 words of the phrase, if there are at least 5 words in the phrase) is searched for in the table of n-grams. If found, the probability is calculated based on the frequency count of the 6-gram found and the total frequency count of all 6-grams starting with that phrase. The model then backs off to 5-grams to search for other possible next words by finding 5-grams that start with the last 4 words of the phrase, and so on until arriving at unigrams. The likelihood of next words from lower-order n-grams is weighted down by a discount factor. When arriving at 1-grams (unigrams), the likelihood of words not yet predicted is based on the frequency count of the unigram and the total frequency count of all unigrams not detected. The words with the 5 highest likelihood scores are returned.
+The model takes the last 5 words entered as the n-gram prefix and finds n-grams which complete this prefix. Then the first word of the prefix is removed and n-grams which complete this reduced prefix are found. This process is repeated until arriving at 1-grams (unigrams). If fewer than 5 words was entered, the model uses all words entered as the first prefix. A score is calculated for the last word of each n-gram found, from the observed counts of each n-gram and the n-gram prefix. For each lower-order n-gram (5, 4, etc.), the score is weighted down by a factor of 0.4. The words with the highest scores are predicted as most likely.
 
 
 Prediction Algorithm Performance
 ========================================================
-To test the performance of the model, a [script](https://github.com/hfoffani/dsci-benchmark) was used. This script imports text from randomly selected tweets and blogs, and then evaluates the performance based on the top 3 predictions for each phrase.
-
-The results obtained were:
+To test the performance of the model, a [script](https://github.com/hfoffani/dsci-benchmark) was used which imports text from randomly selected tweets and blogs, and then evaluates the performance based on the top 3 predictions for each phrase. The results obtained were:
 * Overall top-3 score: 18.91%
-* Overall top-1 precision: 14.13%
-* Overall top-3 precision: 23.05%
+* Overall top-1 precision: 14.18%
+* Overall top-3 precision: 23.03%
+* Average runtime: 144.32 msec
 
-The average runtime was 236.06 msec.
-
-The 23% top-3 precision means that the model returns a correct prediction among its top 3 predictions in just over 1 out of every 5 predictions.
+The 23% top-3 precision means the model returns a correct prediction among its top 3 predictions in just over 1 out of every 5 predictions.
 
 
 How to Use the Shiny App
 ========================================================
-To use the app, navigate [here](add Shiny app URL) and enter a phrase in the text input box. Click *submit*. The app will return the top 3 most likely words to follow the phrase entered, in order from most likely to least likely.
+To use the app, navigate [here](add Shiny app URL) and enter a phrase in the text input box. Click *submit*. The app will return the top 3 most likely words to follow the phrase entered, in order from most likely to least likely. The top 10 most likely words will be plotted with their scores.
 
 ```{r, echo=FALSE, fig.height = 5, fig.width = 10, fig.align = "center"}
 library(imager)
@@ -47,22 +44,3 @@ myimg <- load.image("D:/Users/gary.stocks/Desktop/Coursera/Course 10 Project/cap
 plot(myimg)
 ```
 
-
-
-
-(Include an image of the app)
-
-
-Slide With Code
-========================================================
-
-```{r}
-summary(cars)
-```
-
-Slide With Plot
-========================================================
-
-```{r, echo=FALSE}
-plot(cars)
-```
