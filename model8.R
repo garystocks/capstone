@@ -458,7 +458,7 @@ saveRDS(ngramsDT, file = "./data/ngramsDT.rds")
 # Setup data ---------------------------------------------------------------------------
 
 ngramsDT <- readRDS("./data/ngramsDT.rds")
-setkey(ngramsDT, ngram)
+setkey(ngramsDT, ngram, tail)
 
 
 # Stupid Backoff Prediction Algorithm --------------------------------------------------
@@ -791,3 +791,137 @@ myPrediction <- function(x) {
 }
 
 
+# Kneser-Ney Prediction Algorithm --------------------------------------------------
+
+# Prepare the data by creating a suffix for each ngram from bigrams to fivegrams
+ngrams <- ngrams[count > 2]
+ngrams <- ngrams[, suffix := paste(ngram, tail, sep = "_")]
+ngrams <- ngrams[, suffix := str_replace_all(suffix, "^[a-z0-9-']+_", "")]
+
+# Prediction function
+myPrediction <- function(x) {
+        
+        # Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
+        stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
+        stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
+        
+        # Clean tweets
+        clean_x <- str_replace_all(x, stuff_to_remove, "")
+        
+        # Remove leading and trailing spaces
+        clean_x <- str_trim(clean_x)
+        
+        # Extract last 5 words from input text
+        tkns <- tokens(clean_x, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
+                       remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
+        tkns <- tolower(tkns)
+        n <- length(tkns)
+        
+        # Create ngram search terms
+        unigram <- ""
+        bigram <- ""
+        trigram <- ""
+        quadgram <- ""
+        fivegram <- ""
+        fivegramSuffix <- ""
+        
+        if(n > 0) {unigram <- tkns[n]}
+        if(n > 1) {
+                bigram <- paste(tkns[n-1], tkns[n], sep = "_")
+        }
+        if(n > 2) {
+                trigram <- paste(tkns[n-2], tkns[n-1], tkns[n], sep = "_")
+        }
+        if(n > 3) {
+                quadgram <- paste(tkns[n-3], tkns[n-2], tkns[n-1], tkns[n], sep = "_")
+        }
+        if(n > 4) {
+                fivegram <- paste(tkns[n-4], tkns[n-3], tkns[n-2], tkns[n-1], tkns[n], sep = "_")
+        }
+        
+        # Find sixgrams
+        sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        sixgrams <- ngrams[ngram == fivegram]
+        
+        observedTails <- ""
+        alphaSixgrams <- 1
+        
+        # Calculate the discounted MLE for each sixgram and the alpha value to redistribute
+        discSixgrams <- .75
+        
+        if(nrow(sixgrams) > 0) {
+                denom <- sixgrams[, .(sum(count))][1, 1]
+                sixgrams <- sixgrams[, MLE := ((count - discSixgrams[[1]]) / denom[[1]])]
+                # Calculate alpha for sixgram prefix
+                alphaSixgrams <- 1 - sixgrams[, .(sum(MLE))][1, 1]
+                # Note observed tailwords
+                observedTails <- sixgrams$tail
+        }
+        
+        # Set discount
+        discFivegrams <- .75
+        
+        # For the continuation count, find the number of unique n-grams with each suffix
+        for(i in 1:nrow(sixgrams)) {
+                cont_count <- nrow(ngrams[suffix == sixgrams[i, suffix]])
+                denom_count <- nrow(ngrams[suffix == quadgram])
+                sixgrams[i, c_prob5 := (cont_count[[1]] - discFivegrams[[1]]) / denom_count[[1]]]
+        }
+        
+        # Calculate alpha for fivegrams
+        alphaFivegrams <- 1 - sixgrams[, .(sum(c_prob5))][1, 1]
+        
+        # Set discount
+        discQuadgrams <- .75
+
+        # Calculate next continuation count
+        for(i in 1:nrow(sixgrams)) {
+                sixgrams[i, suffix2 := str_replace_all(sixgrams[i, suffix], "^[a-z0-9-']+_", "")]
+                cont_count <- nrow(ngrams[suffix == sixgrams[i, suffix2]])
+                denom_count <- nrow(ngrams[suffix == trigram])
+                sixgrams[i, c_prob4 := (cont_count[[1]] - discQuadgrams[[1]]) / denom_count[[1]]]
+        }
+        
+        alphaQuadgrams <- 1 - sixgrams[, .(sum(c_prob4))][1, 1]
+        
+        # Set discount
+        discTrigrams <- .75
+        
+        # Calculate the next continuation count
+        for(i in 1:nrow(sixgrams)) {
+                sixgrams[i, suffix3 := str_replace_all(sixgrams[i, suffix2], "^[a-z0-9-']+_", "")]
+                cont_count <- nrow(ngrams[suffix == sixgrams[i, suffix3]])
+                denom_count <- nrow(ngrams[suffix == bigram])
+                sixgrams[i, c_prob3 := (cont_count[[1]] - discQuadgrams[[1]]) / denom_count[[1]]]
+        }
+        
+        alphaTrigrams <- 1 - sixgrams[, .(sum(c_prob3))][1, 1]
+        
+        # Set discount
+        discBigrams <- .75
+        
+        # Calculate the next continuation count
+        for(i in 1:nrow(sixgrams)) {
+                sixgrams[i, suffix4 := str_replace_all(sixgrams[i, suffix3], "^[a-z0-9-']+_", "")]
+                cont_count <- nrow(ngrams[suffix == sixgrams[i, suffix4]])
+                denom_count <- nrow(ngrams[n == 2][suffix == unigram])
+                sixgrams[i, c_prob2 := (cont_count[[1]] - discQuadgrams[[1]]) / denom_count[[1]]]
+        }
+        
+        alphaBigrams <- 1 - sixgrams[, .(sum(c_prob2))][1, 1]
+        
+        # Calculate the next continuation count
+        for(i in 1:nrow(sixgrams)) {
+                sixgrams[i, suffix5 := str_replace_all(sixgrams[i, suffix4], "^[a-z0-9-']+_", "")]
+                cont_count <- nrow(ngrams[n == 2][suffix == sixgrams[i, suffix5]])
+                denom_count <- nrow(ngrams[n == 2])
+                sixgrams[i, c_prob1 := (cont_count[[1]] - discQuadgrams[[1]]) / denom_count[[1]]]
+        }
+        
+        # Put the calculation together
+        sixgrams[, prob := MLE + alphaSixgrams[[1]] * (c_prob5 + alphaFivegrams[[1]] * (c_prob4 + alphaQuadgrams[[1]] * (c_prob3 + alphaTrigrams[[1]] * (c_prob2 + alphaBigrams[[1]] * c_prob1))))]
+        #sixgrams[, prob := c_prob1 * alphaBigrams[[1]] + c_prob2 * alphaTrigrams[[1]] + c_prob3 * alphaQuadgrams[[1]] + c_prob4 * alphaFivegrams[[1]] + c_prob5 * alphaSixgrams[[1]] + MLE]
+
+}
