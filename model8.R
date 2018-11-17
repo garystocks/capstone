@@ -623,7 +623,7 @@ myPrediction <- function(input, ngrams) {
 # Prediction function
 myPrediction <- function(x) {
         
-        # Set absoluate discount
+        # Set absolute discount
         disc <- 0.75
         
         # Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
@@ -694,55 +694,115 @@ myPrediction <- function(x) {
         # Back off to fivegrams
         alphaFivegrams <- 1
         
-        fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
+        fivegrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        fivegrams <- ngrams[ngram == quadgram][!(tail %in% observedTails)]
+        fivegrams2 <- data.table(ngram = vector(mode = "character", length = 0),
+                                 count = vector(mode = "integer", length = 0),
+                                 tail = vector(mode = "character", length = 0))
+        fivegrams1 <- ngrams[ngram == quadgram]
         
         # Calculate the aggregate fivegram count and probabilities
-        if(nrow(fivegrams) > 0) {
-                denom <- fivegrams[, .(sum(count))][1, 1]
-                fivegrams <- fivegrams[, prob := alphaSixgrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+        if(nrow(fivegrams1) > 0) {
+                denom <- fivegrams1[, .(sum(count))][1, 1]
+                fivegrams1 <- fivegrams1[, prob5 := alphaSixgrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
                 # Calculate alpha for fivegrams
-                alphaFivegrams <- alphaSixgrams[[1]] - fivegrams[, .(sum(prob))][1, 1]
+                alphaFivegrams <- alphaSixgrams[[1]] - fivegrams1[, .(sum(prob5))][1, 1]
+                # Separate into observed and unobserved tails
+                fivegrams2 <- fivegrams1[!(tail %in% observedTails)]
+                fivegrams1 <- fivegrams1[tail %in% observedTails]
+                # Add to the sixgrams table
+                sixgrams <- sixgrams[, count5 := 0][, prob5 := 0]
+                for(i in 1:nrow(fivegrams1)) {
+                        sixgrams[tail == fivegrams1[i, tail], count5 := fivegrams1[i, count]]
+                        sixgrams[tail == fivegrams1[i, tail], prob5 := fivegrams1[i, prob5]]
+                }
+                
+                setnames(fivegrams2, "count", "count5")
+                fivegrams2 <- fivegrams2[, count := 0]
+                fivegrams2 <- fivegrams2[, prob := 0]
+                setcolorder(fivegrams2, c("ngram", "count", "tail", "n", "prob", "count5", "prob5"))
+                sixgrams <- rbind(sixgrams, fivegrams2)
+                
                 # Note observed fivegram tail words
-                observedTails <- c(observedTails, fivegrams$tail)
+                observedTails <- c(observedTails, fivegrams2[, tail])
         }
         
         # Back off to quadgrams
         alphaQuadgrams <- 1
         
-        quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
+        quadgrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
-        quadgrams <- ngrams[ngram == trigram][!(tail %in% observedTails)]
+        quadgrams2 <- data.table(ngram = vector(mode = "character", length = 0),
+                                 count = vector(mode = "integer", length = 0),
+                                 tail = vector(mode = "character", length = 0))
+        quadgrams1 <- ngrams[ngram == trigram]
         
         # Calculate the aggregate quadgram count and probabilities
-        if(nrow(quadgrams) > 0) {
-                denom <- quadgrams[, .(sum(count))][1, 1]
-                quadgrams <- quadgrams[, prob := alphaFivegrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+        if(nrow(quadgrams1) > 0) {
+                denom <- quadgrams1[, .(sum(count))][1, 1]
+                quadgrams1 <- quadgrams1[, prob4 := alphaFivegrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
                 # Calculate alpha for quadgrams
-                alphaQuadgrams <- alphaFivegrams[[1]] - quadgrams[, .(sum(prob))][1, 1]
+                alphaQuadgrams <- alphaFivegrams[[1]] - quadgrams1[, .(sum(prob4))][1, 1]
+                # Separate into observed and unobserved tails
+                quadgrams2 <- quadgrams1[!(tail %in% observedTails)]
+                quadgrams1 <- quadgrams1[tail %in% observedTails]
+                # Add to the sixgrams table
+                sixgrams <- sixgrams[, count4 := 0][, prob4 := 0]
+                for(i in 1:nrow(quadgrams1)) {
+                        sixgrams[tail == quadgrams1[i, tail], count4 := quadgrams1[i, count]]
+                        sixgrams[tail == quadgrams1[i, tail], prob4 := quadgrams1[i, prob4]]
+                }
+                
+                setnames(quadgrams2, "count", "count4")
+                quadgrams2 <- quadgrams2[, count := 0][, count5 := 0]
+                quadgrams2 <- quadgrams2[, prob := 0][, prob5 := 0]
+
+                setcolorder(quadgrams2, c("ngram", "count", "tail", "n", "prob", "count5", "prob5", "count4", "prob4"))
+                sixgrams <- rbind(sixgrams, quadgrams2)
+                
                 # Note observed quadgram tail words
-                observedTails <- c(observedTails, quadgrams$tail)
+                observedTails <- c(observedTails, quadgrams2[, tail])
         }
         
         # Back off to trigrams
         alphaTrigrams <- 1
         
-        trigrams <- data.table(ngram = vector(mode = "character", length = 0),
+        trigrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
-        trigrams <- ngrams[ngram == bigram][!(tail %in% observedTails)]
+        trigrams2 <- data.table(ngram = vector(mode = "character", length = 0),
+                                count = vector(mode = "integer", length = 0),
+                                tail = vector(mode = "character", length = 0))
+        trigrams1 <- ngrams[ngram == bigram]
         
         # Calculate the aggregate trigram count and probabilities
-        if(nrow(trigrams) > 0) {
-                denom <- trigrams[, .(sum(count))][1, 1]
-                trigrams <- trigrams[, prob := alphaQuadgrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+        if(nrow(trigrams1) > 0) {
+                denom <- trigrams1[, .(sum(count))][1, 1]
+                trigrams1 <- trigrams1[, prob3 := alphaQuadgrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
                 # Calculate alpha for trigrams
-                alphaTrigrams <- alphaQuadgrams[[1]] - trigrams[, .(sum(prob))][1, 1]
-                # Note observed trigram tail words
-                observedTails <- c(observedTails, trigrams$tail)
+                alphaTrigrams <- alphaQuadgrams[[1]] - trigrams1[, .(sum(prob3))][1, 1]
+                # Separate into observed and unobserved tails
+                trigrams2 <- trigrams1[!(tail %in% observedTails)]
+                trigrams1 <- trigrams1[tail %in% observedTails]
+                # Add to the sixgrams table
+                sixgrams <- sixgrams[, count3 := 0][, prob3 := 0]
+                for(i in 1:nrow(trigrams1)) {
+                        sixgrams[tail == trigrams1[i, tail], count3 := trigrams1[i, count]]
+                        sixgrams[tail == trigrams1[i, tail], prob3 := trigrams1[i, prob3]]
+                }
+                
+                setnames(trigrams2, "count", "count3")
+                trigrams2 <- trigrams2[, count := 0][, count5 := 0][, count4 := 0]
+                trigrams2 <- trigrams2[, prob := 0][, prob5 := 0][, prob4 := 0]
+                
+                setcolorder(trigrams2, c("ngram", "count", "tail", "n", "prob", "count5", "prob5", "count4", "prob4", "count3", "prob3"))
+                sixgrams <- rbind(sixgrams, trigrams2)
+                
+                # Note observed quadgram tail words
+                observedTails <- c(observedTails, trigrams2[, tail])
+                
         }
         
         # Back off to bigrams
