@@ -616,9 +616,196 @@ myPrediction <- function(input, ngrams) {
         return(MLEs)
 }
 
+########################################################################################
 
+# NEW VERSION
+
+# Katz Backoff Prediction Algorithm
+
+########################################################################################
+
+# Prediction function
+myPrediction <- function(x) {
+        
+        # Set absolute discount
+        disc <- 0.75
+        
+        # Create regex to remove URLs, twitter user names, hashtags, possessives and unicode / html tags
+        stuff_to_remove <- c("http[s]?://[[:alnum:].\\/]+", "@[\\w]*", "#[\\w]*", "<.*>", "'s")
+        stuff_to_remove <-  paste(stuff_to_remove, sep = "|", collapse="|")
+        
+        # Clean tweets
+        clean_x <- str_replace_all(x, stuff_to_remove, "")
+        
+        # Remove leading and trailing spaces
+        clean_x <- str_trim(clean_x)
+        
+        # Extract last 5 words from input text
+        tkns <- tokens(clean_x, what = "word", remove_numbers = TRUE, remove_punct = TRUE,
+                       remove_symbols = FALSE, remove_separators = TRUE, remove_twitter = TRUE)
+        tkns <- tolower(tkns)
+        n <- length(tkns)
+        
+        # Create ngram search terms
+        unigram <- ""
+        bigram <- ""
+        trigram <- ""
+        quadgram <- ""
+        fivegram <- ""
+
+        if(n > 0) {unigram <- tkns[n]}
+        if(n > 1) {
+                bigram <- paste(tkns[n-1], tkns[n], sep = "_")
+                bigramPre <- paste(tkns[n-1], sep = "_")
+        }
+        if(n > 2) {
+                trigram <- paste(tkns[n-2], tkns[n-1], tkns[n], sep = "_")
+                trigramPre <- paste(tkns[n-2], tkns[n-1], sep = "_")
+        }
+        if(n > 3) {
+                quadgram <- paste(tkns[n-3], tkns[n-2], tkns[n-1], tkns[n], sep = "_")
+                quadgramPre <- paste(tkns[n-3], tkns[n-2], tkns[n-1], sep = "_")
+        }
+        if(n > 4) {
+                fivegram <- paste(tkns[n-4], tkns[n-3], tkns[n-2], tkns[n-1], tkns[n], sep = "_")
+                fivegramPre <- paste(tkns[n-4], tkns[n-3], tkns[n-2], tkns[n-1], sep = "_")
+        }
+        
+        # Find matching ngrams
+        sixgrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        fivegrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        quadgrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        trigrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        bigrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        unigrams <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        
+        sixgrams <- ngrams[ngram == fivegram]
+        fivegrams <- ngrams[ngram == quadgram]
+        quadgrams <- ngrams[ngram == trigram]
+        trigrams <- ngrams[ngram == bigram]
+        bigrams <- ngrams[ngram == unigram][n == 2]
+        unigrams <- ngrams[n == 1]
+        
+        # Calculate the discounted maximum likelihood estimate for the tail word of each ngram
+        # Calculate the amount of probability mass to redistribute to lower-order ngrams
+        if(nrow(sixgrams) > 0) {
+                denom <- sixgrams[, .(sum(count))][1, 1]
+                sixgrams <- sixgrams[, prob6 := ((count - disc[[1]]) / denom[[1]])]
+                alphaSixgrams <- 1 - sixgrams[, .(sum(prob6))]
+        }
+        if(nrow(fivegrams) > 0) {
+                denom <- fivegrams[, .(sum(count))][1, 1]
+                fivegrams <- fivegrams[, prob5 := ((count - disc[[1]]) / denom[[1]])]
+                if(nrow(sixgrams) > 0) {
+                        alphaFivegrams <- alphaSixgrams * (1 - fivegrams[, .(sum(prob5))])
+                } else {alphaFivegrams <- 1 - fivegrams[, .(sum(prob5))]}
+        }
+        if(nrow(quadgrams) > 0) {
+                denom <- quadgrams[, .(sum(count))][1, 1]
+                quadgrams <- quadgrams[, prob4 := ((count - disc[[1]]) / denom[[1]])]
+                if(nrow(fivegrams) >0) {
+                        alphaQuadgrams <- alphaFivegrams * (1 - quadgrams[, .(sum(prob4))])
+                } else {alphaQuadgrams <- 1 - quadgrams[, .(sum(prob4))]}
+        }
+        if(nrow(trigrams) > 0) {
+                denom <- trigrams[, .(sum(count))][1, 1]
+                trigrams <- trigrams[, prob3 := ((count - disc[[1]]) / denom[[1]])]
+                if(nrow(quadgrams) > 0) {
+                        alphaTrigrams <- alphaQuadgrams * (1 - trigrams[, .(sum(prob3))])
+                } else {alphaTrigrams <- 1 - trigrams[, .(sum(prob3))]}
+        }
+        if(nrow(bigrams) > 0) {
+                denom <- bigrams[, .(sum(count))][1, 1]
+                bigrams <- bigrams[, prob2 := ((count - disc[[1]]) / denom[[1]])]
+                if(nrow(trigrams) > 0) {
+                        alphaBigrams <- alphaTrigrams * (1 - bigrams[, .(sum(prob2))])
+                } else {alphaBigrams <- 1 - bigrams[, .(sum(prob2))]}
+        }
+        if(nrow(unigrams) > 0) {
+                denom <- unigrams[, .(sum(count))][1, 1]
+                unigrams <- unigrams[, prob1 := ((count - disc[[1]]) / denom[[1]])]
+        }
+        
+        # Merge data tables
+        sixgrams <- sixgrams[, ngram := NULL][, count := NULL][, n := NULL]
+        fivegrams <- fivegrams[, ngram := NULL][, count := NULL][, n := NULL]
+        quadgrams <- quadgrams[, ngram := NULL][, count := NULL][, n := NULL]
+        trigrams <- trigrams[, ngram := NULL][, count := NULL][, n := NULL]
+        bigrams <- bigrams[, ngram := NULL][, count := NULL][, n := NULL]
+        unigrams <- unigrams[, ngram := NULL][, count := NULL][, n := NULL]
+        
+        setkey(sixgrams, tail)
+        setkey(fivegrams, tail)
+        setkey(quadgrams, tail)
+        setkey(trigrams, tail)
+        setkey(bigrams, tail)
+        setkey(unigrams, tail)
+        
+        found <- merge(sixgrams, fivegrams, all = TRUE)
+        setkey(found, tail)
+        found <- merge(found, quadgrams, all = TRUE)
+        setkey(found, tail)
+        found <- merge(found, trigrams, all = TRUE)
+        setkey(found, tail)
+        found <- merge(found, bigrams, all = TRUE)
+        setkey(found, tail)
+        found <- merge(found, unigrams, all = TRUE)
+        
+        # Set NA values to zero
+        if(nrow(sixgrams) > 0) {found[is.na(prob6)]$prob6 <- 0}
+        if(nrow(fivegrams) > 0) {found[is.na(prob5)]$prob5 <- 0}
+        if(nrow(quadgrams) > 0) {found[is.na(prob4)]$prob4 <- 0}
+        if(nrow(trigrams) > 0) {found[is.na(prob3)]$prob3 <- 0}
+        if(nrow(bigrams) > 0) {found[is.na(prob2)]$prob2 <- 0}
+        if(nrow(unigrams) > 0) {found[is.na(prob1)]$prob1 <- 0}
+        
+        # Calculate probabilities
+        if(nrow(sixgrams) > 0) {
+                found <- found[, BO_prob := prob6 + alphaSixgrams[[1]] * (prob5 + alphaFivegrams[[1]] * (prob4 + alphaQuadgrams[[1]] * (prob3 + alphaTrigrams[[1]] * (prob2 + alphaBigrams[[1]] * prob1))))]
+        } else if(nrow(sixgrams) == 0 & nrow(fivegrams) > 0) {
+                found <- found[, BO_prob := prob5 + alphaFivegrams[[1]] * (prob4 + alphaQuadgrams[[1]] * (prob3 + alphaTrigrams[[1]] * (prob2 + alphaBigrams[[1]] * prob1)))]
+        } else if(nrow(sixgrams) == 0 & nrow(fivegrams) == 0 & nrow(quadgrams) > 0) {
+                found <- found[, BO_prob := prob4 + alphaQuadgrams[[1]] * (prob3 + alphaTrigrams[[1]] * (prob2 + alphaBigrams[[1]] * prob1))]
+        } else if(nrow(sixgrams) == 0 & nrow(fivegrams) == 0 & nrow(quadgrams) == 0 & nrow(trigrams) > 0) {
+                found <- found[, BO_prob := prob3 + alphaTrigrams[[1]] * (prob2 + alphaBigrams[[1]] * prob1)]
+        } else if(nrow(sixgrams) == 0 & nrow(fivegrams) == 0 & nrow(quadgrams) == 0 & nrow(trigrams) == 0 & nrow(bigrams) > 0) {
+                found <- found[, BO_prob := prob2 + alphaBigrams[[1]] * prob1]
+        } else {
+                found <- found[, BO_prob := prob1] 
+        }
+        
+        # Select top 3 tail words
+        found <- found[order(-BO_prob)]
+
+        # Put top 3 predictions in a character string
+        output <- found[1:3, ]$tail
+        
+        return(output)
+        
+}
+
+
+
+########################################################################################
+
+# OLD version
 
 # Katz Backoff Prediction Algorithm --------------------------------------------------
+
+########################################################################################
+
 
 # Prediction function
 myPrediction <- function(x) {
@@ -689,6 +876,8 @@ myPrediction <- function(x) {
                 alphaSixgrams <- 1 - sixgrams[, .(sum(prob))][1, 1]
                 # Note observed tailwords
                 observedTails <- sixgrams$tail
+        } else {
+                sixgrams <- data.table(ngram = "unknown", count = 0, tail = "unknown", prob = 0)
         }
         
         # Back off to fivegrams
@@ -697,9 +886,11 @@ myPrediction <- function(x) {
         fivegrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
+        fivegrams1[, prob5 := 0]
         fivegrams2 <- data.table(ngram = vector(mode = "character", length = 0),
                                  count = vector(mode = "integer", length = 0),
                                  tail = vector(mode = "character", length = 0))
+        fivegrams2[, prob5 := 0]
         fivegrams1 <- ngrams[ngram == quadgram]
         
         # Calculate the aggregate fivegram count and probabilities
@@ -726,6 +917,8 @@ myPrediction <- function(x) {
                 
                 # Note observed fivegram tail words
                 observedTails <- c(observedTails, fivegrams2[, tail])
+        } else {
+                sixgrams <- sixgrams[, count5 := 0][, prob5 := 0]
         }
         
         # Back off to quadgrams
@@ -734,9 +927,11 @@ myPrediction <- function(x) {
         quadgrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
+        quadgrams1[, prob4 := 0]
         quadgrams2 <- data.table(ngram = vector(mode = "character", length = 0),
                                  count = vector(mode = "integer", length = 0),
                                  tail = vector(mode = "character", length = 0))
+        quadgrams2[, prob4 := 0]
         quadgrams1 <- ngrams[ngram == trigram]
         
         # Calculate the aggregate quadgram count and probabilities
@@ -764,6 +959,8 @@ myPrediction <- function(x) {
                 
                 # Note observed quadgram tail words
                 observedTails <- c(observedTails, quadgrams2[, tail])
+        } else {
+                sixgrams <- sixgrams[, count4 := 0][, prob4 := 0]
         }
         
         # Back off to trigrams
@@ -772,9 +969,11 @@ myPrediction <- function(x) {
         trigrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                                count = vector(mode = "integer", length = 0),
                                tail = vector(mode = "character", length = 0))
+        trigrams1[, prob3 := 0]
         trigrams2 <- data.table(ngram = vector(mode = "character", length = 0),
                                 count = vector(mode = "integer", length = 0),
                                 tail = vector(mode = "character", length = 0))
+        trigrams2[, prob3 := 0]
         trigrams1 <- ngrams[ngram == bigram]
         
         # Calculate the aggregate trigram count and probabilities
@@ -802,25 +1001,50 @@ myPrediction <- function(x) {
                 
                 # Note observed quadgram tail words
                 observedTails <- c(observedTails, trigrams2[, tail])
-                
+        } else {
+                sixgrams <- sixgrams[, count3 := 0][, prob3 := 0]
         }
         
         # Back off to bigrams
         alphaBigrams <- 1
         
-        bigrams <- data.table(ngram = vector(mode = "character", length = 0),
+        bigrams1 <- data.table(ngram = vector(mode = "character", length = 0),
                               count = vector(mode = "integer", length = 0),
                               tail = vector(mode = "character", length = 0))
-        bigrams <- ngrams[ngram == unigram][n == 2][!(tail %in% observedTails)]
+        bigrams1[, prob2 := 0]
+        bigrams2 <- data.table(ngram = vector(mode = "character", length = 0),
+                               count = vector(mode = "integer", length = 0),
+                               tail = vector(mode = "character", length = 0))
+        bigrams2[, prob2 := 0]
+        bigrams1 <- ngrams[ngram == unigram][n == 2]
         
         # Calculate the aggregate bigram count and probabilities
-        if(nrow(bigrams) > 0) {
-                denom <- bigrams[, .(sum(count))][1, 1]
-                bigrams <- bigrams[, prob := alphaTrigrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
+        if(nrow(bigrams1) > 0) {
+                denom <- bigrams1[, .(sum(count))][1, 1]
+                bigrams1 <- bigrams1[, prob2 := alphaTrigrams[[1]] * ((count - disc[[1]]) / denom[[1]])]
                 # Calculate alpha for bigrams
-                alphaBigrams <- alphaTrigrams[[1]] - bigrams[, .(sum(prob))][1, 1]
-                # Note observed bigram tail words
-                observedTails <- c(observedTails, bigrams$tail)
+                alphaBigrams <- alphaTrigrams[[1]] - bigrams1[, .(sum(prob2))][1, 1]
+                # Separate into observed and unobserved tails
+                bigrams2 <- bigrams1[!(tail %in% observedTails)]
+                bigrams1 <- bigrams1[tail %in% observedTails]
+                # Add to the sixgrams table
+                sixgrams <- sixgrams[, count2 := 0][, prob2 := 0]
+                for(i in 1:nrow(bigrams1)) {
+                        sixgrams[tail == bigrams1[i, tail], count2 := bigrams1[i, count]]
+                        sixgrams[tail == bigrams1[i, tail], prob2 := bigrams1[i, prob2]]
+                }
+                
+                setnames(bigrams2, "count", "count2")
+                bigrams2 <- bigrams2[, count := 0][, count5 := 0][, count4 := 0][, count3 := 0]
+                bigrams2 <- bigrams2[, prob := 0][, prob5 := 0][, prob4 := 0][, prob3 := 0]
+                
+                setcolorder(bigrams2, c("ngram", "count", "tail", "n", "prob", "count5", "prob5", "count4", "prob4", "count3", "prob3", "count2", "prob2"))
+                sixgrams <- rbind(sixgrams, bigrams2)
+                
+                # Note observed quadgram tail words
+                observedTails <- c(observedTails, bigrams2[, tail])
+        } else {
+                sixgrams <- sixgrams[, count2 := 0][, prob2 := 0]
         }
         
         # Back off to unigrams
@@ -836,15 +1060,26 @@ myPrediction <- function(x) {
         
         # Calculate MLEs
         if(denom > 0) {
-                unigrams <- unigrams[, prob := alphaBigrams[[1]] * (count / denom[[1]])]
+                unigrams <- unigrams[, prob1 := alphaBigrams[[1]] * (count / denom[[1]])]
         }
         
-        # Put all the MLEs into a single table
-        MLEs <- rbind(sixgrams, fivegrams, quadgrams, trigrams, bigrams, unigrams, fill = TRUE)
-        MLEs <- MLEs[order(-MLEs$prob), ]
+        # Add to sixgrams table
+        sixgrams <- sixgrams[, count1 := 0][, prob1 := 0]
+        setnames(unigrams, "count", "count1")
+        unigrams <- unigrams[, count := 0][, count5 := 0][, count4 := 0][, count3 := 0][, count2 := 0]
+        unigrams <- unigrams[, prob := 0][, prob5 := 0][, prob4 := 0][, prob3 := 0][, prob2 := 0]
+        
+        setcolorder(unigrams, c("ngram", "count", "tail", "n", "prob", "count5", "prob5", "count4", "prob4", "count3", "prob3", "count2", "prob2"))
+        sixgrams <- rbind(sixgrams, unigrams)
+        
+        # Calculate the probability for each tail word
+        sixgrams <- sixgrams[, BO_prob := prob + alphaSixgrams[[1]] * (prob5 + alphaFivegrams[[1]] * (prob4 + alphaQuadgrams[[1]] * (prob3 + alphaTrigrams[[1]] * (prob2 + alphaBigrams[[1]] * prob1))))]
+        
+        # Re-order and select the top 3 predictions
+        sixgrams <- sixgrams[order(-BO_prob)]
         
         # Put top 3 predictions in a character string
-        output <- MLEs[1:3, ]$tail
+        output <- sixgrams[1:3, ]$tail
         
         return(output)
         
